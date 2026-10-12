@@ -224,6 +224,7 @@ input[type=time]{font:inherit;color:var(--ink);background:var(--surface);border:
 .vq{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0}.vopts div{padding:4px 0}
 .vcap{min-height:48px;font-size:14px;color:var(--muted);margin:8px 0}
 .callinks{padding-left:18px;line-height:1.9}
+.vmeter{height:6px;border-radius:3px;background:var(--line);margin:8px 0;overflow:hidden}.vmeter i{display:block;height:100%;width:0;background:var(--muted)}.vmeter i.on{background:var(--good)}
 </style>
 <div class="wrap" id="app"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -983,9 +984,22 @@ function voiceScreen(){
   '<div id="vprog" class="note" style="margin:6px 0"></div><div id="vq" class="vq"></div><div id="vcap" class="vcap"></div>'+
   '<label class="chk"><input type="checkbox" id="vshow" checked> Show question text on screen</label>'+
   '<label class="chk"><input type="checkbox" id="vhead"> I am using headphones (lets you interrupt the coach)</label>'+
-  '<div class="btnrow"><button class="btn primary" id="vstart" style="padding:11px 26px;font-size:16px">Start voice quiz</button><button class="btn" id="vmute" hidden>Mute mic</button><button class="btn" id="vrep" hidden>Repeat question</button><button class="btn" id="vend" hidden>End and see result</button><button class="btn" id="vback">Back</button></div>'+
+  '<label class="chk"><input type="checkbox" id="vptt"'+(lsGet("gq:ptt")==="1"?' checked':'')+'> Push to talk: the mic listens only while you hold the Talk button (best for a noisy room)</label>'+
+  '<div class="fields"><div><label class="lbl" for="vnoise">Background noise filter</label><select id="vnoise"><option value="0">Off</option><option value="1">Standard</option><option value="2">Strong (noisy room)</option></select></div></div>'+
+  '<div class="vmeter" title="Mic level"><i id="vlvl"></i></div>'+
+  '<div class="btnrow"><button class="btn primary" id="vstart" style="padding:11px 26px;font-size:16px">Start voice quiz</button><button class="btn primary" id="vtalk" hidden style="padding:11px 26px;touch-action:none;user-select:none">Hold to talk</button><button class="btn" id="vmute" hidden>Mute mic</button><button class="btn" id="vrep" hidden>Repeat question</button><button class="btn" id="vend" hidden>End and see result</button><button class="btn" id="vback">Back</button></div>'+
   '<p class="note">Use headphones for the best result. Without them the mic stays off while the coach is talking, so it does not hear itself. Keep this screen open: browsers stop the microphone when the screen locks or the tab goes to the background.</p></div>';
   $("#vshow").onchange=vshow;vshow();
+  $("#vnoise").value=lsGet("gq:noise")||"1";
+  $("#vnoise").onchange=function(){lsSet("gq:noise",$("#vnoise").value);if(V)V.noise=+$("#vnoise").value};
+  $("#vptt").onchange=function(){lsSet("gq:ptt",$("#vptt").checked?"1":"0");vst("Push to talk changes apply the next time you press Start or Reconnect.")};
+  var tk=$("#vtalk");
+  function talk(on){if(!V||!V.ready||V.talking===on)return;V.talking=on;tk.textContent=on?"Release to send":"Hold to talk";if(on){vStopAudio();vSend({realtimeInput:{activityStart:{}}})}else vSend({realtimeInput:{activityEnd:{}}})}
+  tk.onpointerdown=function(e){e.preventDefault();try{tk.setPointerCapture(e.pointerId)}catch(x){}talk(true)};
+  tk.onpointerup=tk.onpointercancel=function(){talk(false)};
+  tk.oncontextmenu=function(e){e.preventDefault()};
+  document.onkeydown=function(e){if(S.screen==="voice"&&V&&V.ptt&&e.code==="Space"&&!e.repeat&&e.target.tagName!=="INPUT"&&e.target.tagName!=="SELECT"){e.preventDefault();talk(true)}};
+  document.onkeyup=function(e){if(S.screen==="voice"&&V&&V.ptt&&e.code==="Space"){e.preventDefault();talk(false)}};
   $("#vstart").onclick=vStart;
   $("#vback").onclick=function(){vCleanup();startScreen()};
   $("#vmute").onclick=function(){if(!V)return;V.muted=!V.muted;$("#vmute").textContent=V.muted?"Unmute mic":"Mute mic"};
@@ -1005,7 +1019,9 @@ async function vStart(){
   var url=lsGet(GK.ws)||"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key="+encodeURIComponent(gkey());
   var ws=new WebSocket(url);V.ws=ws;
   ws.onopen=function(){
-    ws.send(JSON.stringify({setup:{model:"models/"+lmodel(),generationConfig:{responseModalities:["AUDIO"]},systemInstruction:{parts:[{text:VSYS}]},tools:VTOOLS,inputAudioTranscription:{},outputAudioTranscription:{}}}));
+    var ptt=!!($("#vptt")&&$("#vptt").checked);
+    var vad=ptt?{disabled:true}:{startOfSpeechSensitivity:"START_SENSITIVITY_LOW",endOfSpeechSensitivity:"END_SENSITIVITY_LOW",prefixPaddingMs:100,silenceDurationMs:700};
+    ws.send(JSON.stringify({setup:{model:"models/"+lmodel(),generationConfig:{responseModalities:["AUDIO"]},systemInstruction:{parts:[{text:VSYS}]},tools:VTOOLS,realtimeInputConfig:{automaticActivityDetection:vad},inputAudioTranscription:{},outputAudioTranscription:{}}}));
   };
   ws.onmessage=function(ev){
     var cur=V;if(!cur)return;
@@ -1025,19 +1041,38 @@ async function vStart(){
 }
 function vStartMic(){
   V.src=V.ctx.createMediaStreamSource(V.stream);
+  var hp=V.ctx.createBiquadFilter();hp.type="highpass";hp.frequency.value=120;
+  V.hp=hp;
   V.proc=V.ctx.createScriptProcessor(4096,1,1);
+  V.noise=+(($("#vnoise")||{}).value||1);V.ptt=!!($("#vptt")&&$("#vptt").checked);
+  V.floor=0;V.hold=0;V.talking=false;
   V.proc.onaudioprocess=function(e){
     if(!V||!V.ready||V.muted||!V.ws||V.ws.readyState!==1)return;
     var head=$("#vhead");
     if(!(head&&head.checked)&&V.ctx.currentTime<V.next+0.4)return;
-    var pcm=toPCM16(e.inputBuffer.getChannelData(0),V.ctx.sampleRate);
+    var f=e.inputBuffer.getChannelData(0),s=0,i;
+    for(i=0;i<f.length;i++)s+=f[i]*f[i];
+    var rms=Math.sqrt(s/f.length),open=true;
+    if(V.ptt)open=V.talking;
+    else if(V.noise>0){
+      var mult=V.noise===1?2.5:4,min=V.noise===1?0.01:0.02;
+      if(!V.floor||rms<V.floor)V.floor=Math.min(rms,0.05);
+      var thr=Math.max(min,V.floor*mult);
+      if(rms>thr)V.hold=7;else if(V.hold>0)V.hold--;
+      open=V.hold>0;
+      if(!open)V.floor+=(Math.min(rms,0.05)-V.floor)*0.02;
+    }
+    var m=$("#vlvl");if(m){m.style.width=Math.min(100,rms*900)+"%";m.className=open?"on":""}
+    if(V.ptt&&!open)return;
+    var pcm=open?toPCM16(f,V.ctx.sampleRate):new Int16Array(Math.floor(f.length*16000/V.ctx.sampleRate));
     V.ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(pcm.buffer),mimeType:"audio/pcm;rate=16000"}}}));
   };
-  V.src.connect(V.proc);V.proc.connect(V.ctx.destination);
+  V.src.connect(hp);hp.connect(V.proc);V.proc.connect(V.ctx.destination);
 }
 function vStopMic(){
   try{if(V&&V.proc){V.proc.disconnect();V.proc.onaudioprocess=null}}catch(e){}
   try{if(V&&V.src)V.src.disconnect()}catch(e){}
+  try{if(V&&V.hp)V.hp.disconnect()}catch(e){}
 }
 function vPlay(d){
   var bin=atob(d),n=bin.length>>1,buf=V.ctx.createBuffer(1,n,24000),ch=buf.getChannelData(0);
@@ -1056,7 +1091,7 @@ function vMsg(m){
   if(!V)return;
   if(m.setupComplete){
     V.ready=true;vst("Connected. The coach will read the first question. Speak your answer after it.");
-    $("#vstart").hidden=true;["vmute","vrep","vend"].forEach(function(k){$("#"+k).hidden=false});
+    $("#vstart").hidden=true;["vmute","vrep","vend"].forEach(function(k){$("#"+k).hidden=false});$("#vtalk").hidden=!($("#vptt")&&$("#vptt").checked);
     vStartMic();vSendQuestion(S.vi>0);return;
   }
   var sc=m.serverContent;
