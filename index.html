@@ -1,0 +1,1108 @@
+<title>Voice PDF Test Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: exam-hall single column on phones; question panel + palette sidebar on desktop. Ink-blue accent on cool slate neutrals. */
+:root{
+  --bg:#eef1f7; --surface:#ffffff; --ink:#14192b; --muted:#59627d; --line:#dbe0ee;
+  --accent:#2447c8; --accent-ink:#ffffff; --accent-soft:#e6ebfb;
+  --good:#16774f; --good-soft:#e2f4ea; --bad:#b92f2f; --bad-soft:#fbe7e7;
+  --mark:#6444d1; --mark-soft:#ece8fb; --warn:#9a6511; --warn-soft:#fbf0dc;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1220; --surface:#171c2f; --ink:#e8ebf7; --muted:#9aa3bf; --line:#293050;
+    --accent:#8ba2ff; --accent-ink:#0e1220; --accent-soft:#222a4d;
+    --good:#52d19a; --good-soft:#17332a; --bad:#ff8585; --bad-soft:#3a1c24; --mark:#ab9dff; --mark-soft:#2a2550; --warn:#f0b955; --warn-soft:#3a2f17;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1220; --surface:#171c2f; --ink:#e8ebf7; --muted:#9aa3bf; --line:#293050;
+  --accent:#8ba2ff; --accent-ink:#0e1220; --accent-soft:#222a4d;
+  --good:#52d19a; --good-soft:#17332a; --bad:#ff8585; --bad-soft:#3a1c24; --mark:#ab9dff; --mark-soft:#2a2550; --warn:#f0b955; --warn-soft:#3a2f17;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;padding-inline:16px}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1120px;margin-inline:auto;padding-block:16px 28px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.brand{flex:1 1 220px;min-width:0}
+.brand b{display:block;font-size:15px;line-height:1.25}
+.brand span{font-size:12.5px;color:var(--muted)}
+.timer{font-family:var(--mono);font-weight:600;font-size:20px;padding:4px 12px;border-radius:8px;background:var(--accent-soft);color:var(--accent);min-width:98px;text-align:center}
+.timer.low{background:var(--bad-soft);color:var(--bad)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{background:var(--bad);color:#fff;border-color:var(--bad)}
+.btn.mk{border-color:var(--mark);color:var(--mark)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.pbtn{display:none}
+
+/* start screen */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px}
+.start{max-width:720px;margin:24px auto}
+.start h1{font-size:26px;line-height:1.2;margin:0 0 6px;text-wrap:balance}
+.start .sub{color:var(--muted);margin:0 0 18px}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.meta div{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.meta small{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.meta strong{font-size:18px}
+.rules{margin:0 0 20px;padding-left:20px;color:var(--ink)}
+.rules li{margin-bottom:6px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;color:var(--muted);margin:0 0 20px}
+.legend i{display:inline-block;width:20px;height:20px;border-radius:5px;vertical-align:middle;margin-right:6px}
+
+/* test layout */
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
+@media (min-width:900px){.grid{grid-template-columns:minmax(0,1fr) 300px}}
+.qcard{padding:0;overflow:hidden}
+.qhead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--bg)}
+.qnum{font-weight:600}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 10px;color:var(--muted);background:var(--surface)}
+.tag.E{color:var(--good);border-color:var(--good)} .tag.M{color:var(--warn);border-color:var(--warn)} .tag.H{color:var(--bad);border-color:var(--bad)}
+.qbody{padding:18px}
+.stem p{margin:0 0 8px;max-width:68ch}
+.stem p.st{padding-left:18px;text-indent:-18px;margin-bottom:4px}
+.tbl{overflow-x:auto;margin:10px 0 14px}
+.tbl table{border-collapse:collapse;min-width:320px;width:100%;max-width:560px}
+.tbl th,.tbl td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top;font-size:15px}
+.tbl th{background:var(--bg);font-weight:600}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.opt{display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;padding:11px 14px;min-width:0}
+.opt:hover{border-color:var(--accent)}
+.opt .k{flex:none;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--muted);display:grid;place-items:center;font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase}
+.opt .t{min-width:0;overflow-wrap:anywhere}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.opt.sel .k{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.opt.ok{border-color:var(--good);background:var(--good-soft)}
+.opt.ok .k{background:var(--good);border-color:var(--good);color:#fff}
+.opt.no{border-color:var(--bad);background:var(--bad-soft)}
+.opt.no .k{background:var(--bad);border-color:var(--bad);color:#fff}
+.opt.ro{cursor:default}
+.actions{position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:8px;padding:12px 18px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--surface)}
+.actions .sp{flex:1}
+
+/* palette */
+.side{padding:16px}
+.side h2{font-size:14px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.pal{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.pb{position:relative;aspect-ratio:1;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);font-family:var(--mono);font-weight:600;font-size:14px;color:var(--muted)}
+.pb.na{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.pb.an{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.pb.mk{background:var(--mark-soft);border-color:var(--mark);color:var(--mark);border-radius:50%}
+.pb.am{background:var(--mark-soft);border-color:var(--mark);color:var(--mark);border-radius:50%}
+.pb.am::after{content:"";position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;background:var(--good);border:2px solid var(--surface)}
+.pb.cur{outline:3px solid var(--accent);outline-offset:1px}
+.counts{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;font-size:13px;color:var(--muted);margin-bottom:14px}
+.counts b{color:var(--ink);font-family:var(--mono)}
+.side .btn{width:100%}
+
+@media (max-width:899px){
+  .pbtn{display:inline-block}
+  .side{display:none;position:fixed;inset:auto 0 0 0;z-index:30;max-height:78vh;overflow:auto;border-radius:16px 16px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.28);padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+  .side.open{display:block}
+  .scrim{position:fixed;inset:0;background:rgba(10,14,28,.5);z-index:25}
+  .scrim[hidden]{display:none!important}
+}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(10,14,28,.55)}
+.modal .box{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+.modal h3{margin:0 0 10px;font-size:19px}
+.modal .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;justify-content:flex-end}
+.sumtbl{width:100%;border-collapse:collapse;font-size:15px}
+.sumtbl td{padding:5px 0;border-bottom:1px solid var(--line)}
+.sumtbl td:last-child{text-align:right;font-family:var(--mono);font-weight:600}
+
+/* result */
+.res h1{font-size:24px;margin:0 0 4px}
+.score{display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin:14px 0 18px}
+.big{font-family:var(--mono);font-size:44px;font-weight:600;line-height:1;color:var(--accent)}
+.big small{font-size:18px;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;flex:1 1 380px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.tile small{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.tile strong{font-family:var(--mono);font-size:22px}
+.tile.g strong{color:var(--good)} .tile.b strong{color:var(--bad)} .tile.w strong{color:var(--warn)}
+.bd{width:100%;border-collapse:collapse;font-size:14.5px;margin-top:6px}
+.bd th,.bd td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
+.bd th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.bar{height:8px;border-radius:4px;background:var(--bg);overflow:hidden;min-width:70px}
+.bar i{display:block;height:100%;background:var(--good)}
+.bdwrap{overflow-x:auto}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 12px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 14px;font-size:14px}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.rv{margin-bottom:14px}
+.verdict{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;margin-left:auto}
+.verdict.c{background:var(--good-soft);color:var(--good)} .verdict.w{background:var(--bad-soft);color:var(--bad)} .verdict.s{background:var(--warn-soft);color:var(--warn)}
+.exp{margin-top:14px;padding:12px 14px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:15px}
+.exp p{margin:0 0 6px;max-width:70ch}
+.exp .ref{color:var(--muted);font-size:13px;margin:0}
+.yr{font-size:14px;color:var(--muted);margin:0 0 8px}
+@media (prefers-reduced-motion:no-preference){.opt,.btn,.pb{transition:background .12s,border-color .12s}}
+
+/* setup + generation */
+.note{color:var(--muted);font-size:14px;margin:10px 0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px}
+.seg button{border:0;background:var(--surface);padding:8px 16px;font-weight:500}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.drop{display:block;border:2px dashed var(--line);border-radius:12px;padding:22px 16px;text-align:center;color:var(--muted);cursor:pointer;overflow-wrap:anywhere}
+.drop:hover,.drop:focus{border-color:var(--accent);color:var(--ink)}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.lbl{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px}
+input[type=text],input[type=number],select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;max-width:100%}
+input[type=number]{width:92px}
+textarea{width:100%;resize:vertical}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0}
+.fields input,.fields select{width:100%}
+.chk{display:flex;gap:8px;align-items:center;margin:0 0 16px;font-size:15px}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.prog{margin-top:16px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.stp{display:flex;gap:10px;align-items:center;color:var(--muted)}
+.stp .dot{width:10px;height:10px;border-radius:50%;background:var(--line);flex:none}
+.stp.on{color:var(--ink)}.stp.on .dot{background:var(--accent);animation:pulse 1s infinite}
+.stp.ok .dot{background:var(--good)}.stp.bad .dot{background:var(--bad)}
+@keyframes pulse{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.stp.on .dot{animation:none}}
+.err{margin-top:14px;border:1px solid var(--bad);background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:10px 14px;font-size:15px}
+.resume{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:18px;padding:12px 14px;border:1px solid var(--line);border-radius:10px}
+.start{max-width:760px}
+
+/* revision */
+.revcard{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 18px;padding:12px 14px;border:1px solid var(--accent);background:var(--accent-soft);border-radius:10px}
+.revcard span{display:block;font-size:14px;color:var(--muted)}
+.revp{margin:14px 0 18px;padding:14px 16px;border:1px solid var(--mark);background:var(--mark-soft);border-radius:12px}
+.revp h2{margin:0 0 6px;font-size:16px}
+.revp p{margin:0 0 8px;max-width:68ch}
+.steps{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 12px}
+.chipd{display:flex;flex-direction:column;border:1px solid var(--mark);border-radius:8px;padding:5px 12px;background:var(--surface);font-size:13px;line-height:1.35}
+.chipd b{font-family:var(--mono);color:var(--mark)}
+.tlrow{padding:12px 0;border-bottom:1px solid var(--line)}
+.tlrow.now .tlh b{color:var(--bad)}
+.tlh{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.tlbar{height:8px;border-radius:4px;background:var(--bg);margin:6px 0 4px;overflow:hidden}
+.tlbar i{display:block;height:100%;background:var(--mark)}
+.tlrow.now .tlbar i{background:var(--bad)}
+.tlrow details{font-size:14px;color:var(--muted)}
+.tlrow summary{cursor:pointer}
+.tlrow ul{margin:8px 0 0;padding-left:18px}
+.tlrow li{margin-bottom:4px;overflow-wrap:anywhere}
+.step{font-family:var(--mono);font-size:12px;color:var(--mark)}
+
+/* source viewer */
+.modal.src{padding:8px;z-index:60}
+.sv{width:min(1000px,100%);height:100%;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.svh{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
+.svh .sp{flex:1}
+.svh input[type=number]{width:72px}
+.srl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.svb{flex:1;overflow:auto;padding:12px;background:var(--bg);text-align:center}
+.svb canvas{max-width:none;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.25);border-radius:4px}
+.svask{max-width:460px;margin:40px auto;text-align:left}
+.srcbtn{margin-right:8px}
+
+.calbox{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:16px 0 4px;padding:12px 14px;border:1px solid var(--line);border-radius:10px}
+.calbox span{display:block;font-size:14px;color:var(--muted)}
+input[type=time]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+
+.setbox{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:12px 0}
+.setbox summary{cursor:pointer;font-size:15px}.kst{color:var(--muted);font-size:13px;margin-left:6px}
+.setbox input[type=password],.setbox input[type=text]{width:100%;box-sizing:border-box;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.vbar{margin:12px 0}.vst{display:inline-block;padding:6px 12px;border-radius:999px;background:var(--accent-soft);color:var(--ink);font-size:14px}
+.vq{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0}.vopts div{padding:4px 0}
+.vcap{min-height:48px;font-size:14px;color:var(--muted);margin:8px 0}
+.callinks{padding-left:18px;line-height:1.9}
+</style>
+<div class="wrap" id="app"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+var L="abcd";
+var TYPES=["Statement","Chronology","Match","Negative","Direct","Assertion-Reason"];
+var SHARE={"Statement":0.30,"Chronology":0.1333,"Match":0.1333,"Negative":0.1667,"Direct":0.1667,"Assertion-Reason":0.10};
+var AR_OPTS=["Both A and R are true, and R is the correct explanation of A","Both A and R are true, but R is not the correct explanation of A","A is true, but R is false","A is false, but R is true"];
+var POS=1,NEG=1/3,DN={E:"Easy",M:"Moderate",H:"Hard"},MAXCHARS=60000;
+var Q=[],META={title:"",src:"",dur:0,note:""};
+var SU={mode:"pdf",pdf:null,name:"",pages:0};
+var S={},CTL=null;
+var $=function(s,r){return (r||document).querySelector(s)};
+function esc(x){return String(x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function fmt(sec){sec=Math.max(0,Math.round(sec));var m=Math.floor(sec/60),s=sec%60;return (m<10?"0":"")+m+":"+(s<10?"0":"")+s}
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
+
+/* ================= REVISION PLAN (Leitner, offsets from the day a question was missed) ================= */
+var OFF=[1,3,7,14,30];
+function pad(n){return (n<10?"0":"")+n}
+function ymd(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function today(){return ymd(new Date())}
+function addDays(s,n){var p=s.split("-");return ymd(new Date(+p[0],+p[1]-1,+p[2]+n))}
+function niceDate(s){var p=s.split("-");return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})}
+function dayWord(s){var t=today();return s===addDays(t,1)?"Tomorrow":niceDate(s)}
+function bankLoad(){try{var b=JSON.parse(lsGet("pdftest:rev")||"[]");return Array.isArray(b)?b:[]}catch(e){return []}}
+function bankSave(b){lsSet("pdftest:rev",JSON.stringify(b))}
+function qid(q){var s=q.s.join("|")+"#"+q.o.join("|"),h=5381;for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return "q"+(h>>>0).toString(36)}
+function missed(list,title){
+  var b=bankLoad(),by={},t=today(),added=0;
+  b.forEach(function(x){by[x.id]=x});
+  list.forEach(function(q){
+    var id=qid(q),x=by[id];
+    if(x){x.box=0;x.start=t;x.due=addDays(t,OFF[0])}
+    else{b.push({id:id,q:q,src:title,box:0,start:t,due:addDays(t,OFF[0])});added++}
+  });
+  bankSave(b);return added;
+}
+function reviewed(results){
+  var b=bankLoad(),t=today(),up=0,reset=0,done=0,res={};
+  results.forEach(function(r){res[r.id]=r.ok});
+  b=b.filter(function(x){
+    if(!(x.id in res))return true;
+    if(res[x.id]){
+      x.box++;
+      if(x.box>=OFF.length){done++;return false}
+      var d=addDays(x.start,OFF[x.box]);
+      x.due=d>t?d:addDays(t,1);up++;
+    }else{x.box=0;x.start=t;x.due=addDays(t,OFF[0]);reset++}
+    return true;
+  });
+  bankSave(b);return {up:up,reset:reset,done:done};
+}
+function bankStats(){
+  var b=bankLoad(),t=today(),tm=addDays(t,1),wk=addDays(t,7),s={total:b.length,due:0,tomorrow:0,week:0};
+  b.forEach(function(x){if(x.due<=t)s.due++;else if(x.due===tm)s.tomorrow++;if(x.due>t&&x.due<=wk)s.week++});
+  return s;
+}
+function startDrill(){
+  var t=today(),due=bankLoad().filter(function(x){return x.due<=t});
+  if(!due.length)return;
+  shuffle(due);
+  var srcs=[];due.forEach(function(x){if(srcs.indexOf(x.src)<0)srcs.push(x.src)});
+  Q=due.map(function(x){return x.q});
+  META={title:"Revision drill",src:due.length+" due · from "+srcs.slice(0,3).join(", ")+(srcs.length>3?" and more":""),dur:Math.max(300,due.length*60),note:"",style:"",rev:due.map(function(x){return x.id})};
+  fresh();startScreen();
+}
+function timelineScreen(){
+  S.screen="timeline";
+  var b=bankLoad(),t=today(),groups={};
+  b.forEach(function(x){var k=x.due<=t?"now":x.due;(groups[k]=groups[k]||[]).push(x)});
+  var keys=Object.keys(groups).filter(function(k){return k!=="now"}).sort();
+  var max=Math.max.apply(null,Object.keys(groups).map(function(k){return groups[k].length}).concat([1]));
+  function row(label,items,isNow){
+    var srcs=[];items.forEach(function(x){if(srcs.indexOf(x.src)<0)srcs.push(x.src)});
+    return '<div class="tlrow'+(isNow?' now':'')+'"><div class="tlh"><b>'+esc(label)+'</b><span class="mono">'+items.length+' question'+(items.length>1?'s':'')+'</span></div><div class="tlbar"><i style="width:'+Math.round(100*items.length/max)+'%"></i></div><details><summary>'+esc(srcs.join(", "))+'</summary><ul>'+items.map(function(x){return '<li>'+esc(x.q.s[0].slice(0,110))+' <span class="step">step '+(x.box+1)+' of '+OFF.length+'</span></li>'}).join("")+'</ul></details></div>';
+  }
+  var h='<div class="card start" style="max-width:820px"><h1>Revision timeline</h1><p class="sub">A missed question comes back at D+1, D+3, D+7, D+14 and D+30 counted from the day you missed it. Get it right and it moves to the next step. Miss it and it returns tomorrow. It leaves the plan after the D+30 review.</p>';
+  if(!b.length)h+='<p class="note">Nothing scheduled yet. Wrong and skipped questions from your next test will appear here.</p>';
+  else{
+    if(groups.now)h+=row("Due now",groups.now,true);
+    keys.forEach(function(k){h+=row(dayWord(k),groups[k],false)});
+  }
+  h+='<div class="btnrow" style="margin-top:18px"><button class="btn primary" id="tdrill"'+(groups.now?'':' disabled')+'>Revise now'+(groups.now?' ('+groups.now.length+')':'')+'</button><button class="btn" id="tcopy"'+(b.length?'':' disabled')+'>Copy plan for Claude</button><button class="btn" id="tcsv"'+(b.length?'':' disabled')+'>Download CSV</button><button class="btn" id="tclr"'+(b.length?'':' disabled')+'>Clear plan</button><button class="btn" id="tback">Back</button></div><p id="tmsg" class="note" hidden></p>'+
+  '<div class="calbox"><div><b>Google Calendar</b><span>One 30 minute event on each revision date, with a 10 minute popup reminder.</span></div><div class="btnrow"><label class="lbl" for="caltime" style="margin:0">Time</label><input id="caltime" type="time" value="'+esc(lsGet("pdftest:caltime")||"07:00")+'"><button class="btn primary" id="tcal"'+(b.length?'':' disabled')+'>Add to Google Calendar</button></div></div><p id="cmsg" class="note" role="status" hidden></p><p class="note">Inside Claude this button creates the events for you. In a normal browser it gives you a calendar file and one-tap Google Calendar links for each date.</p></div>';
+  $("#app").innerHTML=h;window.scrollTo({top:0});
+  $("#tback").onclick=setupScreen;
+  $("#tdrill").onclick=startDrill;
+  $("#tclr").onclick=function(){var c=$("#tclr");if(c.dataset.sure){bankSave([]);timelineScreen()}else{c.dataset.sure="1";c.textContent="Click again to clear"}};
+  $("#tcsv").onclick=downloadCsv;$("#tcopy").onclick=copyPlan;$("#tcal").onclick=addToCalendar;
+}
+function planByDate(){
+  var by={},t=today();
+  bankLoad().forEach(function(x){
+    var first=x.due<=t?t:x.due,ds=[first];
+    for(var j=x.box+1;j<OFF.length;j++){var e=addDays(x.start,OFF[j]);if(e>first)ds.push(e)}
+    ds.forEach(function(d){var o=by[d]||(by[d]={n:0,src:[]});o.n++;if(o.src.indexOf(x.src)<0)o.src.push(x.src)});
+  });
+  return by;
+}
+async function downloadCsv(){
+  var m=$("#tmsg"),by=planByDate();
+  var rows=["Subject,Start Date,End Date,All Day Event,Description"];
+  Object.keys(by).sort().forEach(function(d){
+    var p=d.split("-"),us=p[1]+"/"+p[2]+"/"+p[0];
+    rows.push('"Revise '+by[d].n+' missed MCQs",'+us+','+us+',True,"Open PDF Test Maker, then Revision, then Revise now"');
+  });
+  m.hidden=false;
+  try{
+    var dl=(window.claude&&window.claude.use)?await window.claude.use("downloads"):null;
+    if(!dl){saveBlob("revision-plan.csv",rows.join("\n"),"text/csv");m.textContent="Saved. Import it in Google Calendar to get the reminders.";return}
+    await dl.save({filename:"revision-plan.csv",data:rows.join("\n")});
+    m.textContent="Saved. Import it in Google Calendar to get the reminders.";
+  }catch(e){m.textContent=(e&&e.code==="declined")?"Download cancelled.":"Could not save the file here."}
+}
+async function copyPlan(){
+  var by=planByDate(),keys=Object.keys(by).sort(),m=$("#tmsg");
+  var lines=["Please add these all-day revision reminders to my calendar. This is my PDF Test Maker revision plan, made "+today()+". One event per date, titled \"Revise N missed MCQs\", with the test names in the description:"];
+  keys.forEach(function(d){lines.push(d+" ("+niceDate(d)+"): "+by[d].n+" question"+(by[d].n>1?"s":"")+" - "+by[d].src.join(", "))});
+  var text=lines.join("\n");
+  m.hidden=false;
+  try{await navigator.clipboard.writeText(text);m.textContent="Copied. Paste it in a Claude chat and it will add the events to your calendar."}
+  catch(e){
+    m.innerHTML='Copy this text and paste it in a Claude chat:<textarea id="plantxt" rows="6" style="width:100%;margin-top:6px" readonly></textarea>';
+    var ta=$("#plantxt");ta.value=text;ta.focus();ta.select();
+  }
+}
+function calLoad(){try{return JSON.parse(lsGet("pdftest:cal")||"{}")||{}}catch(e){return {}}}
+function calSave(o){lsSet("pdftest:cal",JSON.stringify(o))}
+function isoLocal(d){return ymd(d)+"T"+pad(d.getHours())+":"+pad(d.getMinutes())+":00"}
+function calMsg(t){var m=$("#cmsg");if(m){m.hidden=false;m.textContent=t}}
+function calErr(e){
+  var c=e&&e.code;
+  if(c==="not_in_manifest"||c==="not_granted"||c==="approval_required"||c==="consent_required")return "Calendar access was not allowed for this page. Press the button again and choose Allow.";
+  if(c==="server_not_connected"||c==="selection_required")return "Google Calendar is not connected. Add it in claude.ai Settings, Connectors.";
+  if(c==="needs_reauth")return "Reconnect Google Calendar in claude.ai Settings, Connectors, then try again.";
+  if(c==="capability_disabled"||c==="capability_removed")return "Calendar is not available in this view. Open the page inside Claude.";
+  if(c==="tool_error")return "Google Calendar refused the request"+(e.message?" ("+String(e.message).slice(0,140)+")":"")+".";
+  return "Could not reach Google Calendar. Check your calendar for the last date before trying again. Dates already added are skipped.";
+}
+async function addToCalendar(){
+  var btn=$("#tcal"),tv=$("#caltime").value||"07:00";
+  lsSet("pdftest:caltime",tv);
+  var mcp=null;
+  try{mcp=(window.claude&&window.claude.use)?await window.claude.use("mcp"):null}catch(e){}
+  if(!mcp){calFallback(tv);return}
+  var by=planByDate(),done=calLoad(),dates=Object.keys(by).sort().filter(function(d){return !done[d]});
+  if(!dates.length){calMsg("Every date in the plan is already in your calendar.");return}
+  btn.disabled=true;
+  var n=0;
+  try{
+    for(var i=0;i<dates.length;i++){
+      var d=dates[i],o=by[d],st=new Date(d+"T"+tv+":00"),en=new Date(st.getTime()+30*60000);
+      calMsg("Adding "+(i+1)+" of "+dates.length+" ("+niceDate(d)+")…");
+      await mcp.callTool("Google Calendar","create_event",{
+        summary:"Revise MCQs (PDF Test Maker)",
+        startTime:isoLocal(st),endTime:isoLocal(en),
+        description:o.n+" missed question"+(o.n>1?"s":"")+" due. From: "+o.src.join(", ")+". Open PDF Test Maker, then Revision, then Revise now.",
+        overrideReminders:[{method:"popup",minutes:10}]
+      });
+      done[d]=1;calSave(done);n++;
+    }
+    calMsg("Added "+n+" revision event"+(n>1?"s":"")+" to Google Calendar at "+tv+", each with a 10 minute reminder.");
+  }catch(e){calMsg((n?"Added "+n+" before stopping. ":"")+calErr(e))}
+  finally{btn.disabled=false}
+}
+function revPanel(){
+  var t=today();
+  if(META.rev){
+    var r=S.revRes||{up:0,reset:0,done:0},st=bankStats();
+    return '<div class="revp"><h2>Revision update</h2><p>'+r.up+' moved to the next step, '+r.reset+' sent back to tomorrow, '+r.done+' finished the D+30 review and left the plan.</p><p>Still in the plan: <b>'+st.total+'</b>. Due tomorrow: <b>'+st.tomorrow+'</b>.</p><div class="btnrow"><button class="btn primary" id="tl">Open timeline</button></div></div>';
+  }
+  var n=S.nmiss||0;
+  if(!n)return '<div class="revp"><h2>Revision plan</h2><p>No wrong or skipped questions, so nothing is scheduled from this test.</p></div>';
+  var chips=OFF.map(function(o){return '<span class="chipd"><b>D+'+o+'</b>'+esc(niceDate(addDays(t,o)))+'</span>'}).join("");
+  return '<div class="revp"><h2>Revision plan</h2><p><b>'+n+'</b> wrong or skipped question'+(n>1?'s were':' was')+' scheduled. The first review is tomorrow, then:</p><div class="steps">'+chips+'</div><div class="btnrow"><button class="btn primary" id="tl">Open timeline</button></div></div>';
+}
+
+/* ================= SOURCE PDF STORE + VIEWER ================= */
+var PDFS={},sv=null;
+function hash(str){var h=5381;for(var i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;return (h>>>0).toString(36)}
+function idb(){return new Promise(function(res,rej){try{var r=indexedDB.open("pdftest",1);r.onupgradeneeded=function(){r.result.createObjectStore("pdfs")};r.onsuccess=function(){res(r.result)};r.onerror=function(){rej(r.error)}}catch(e){rej(e)}})}
+async function idbPut(k,v){try{var d=await idb();await new Promise(function(res,rej){var t=d.transaction("pdfs","readwrite");t.objectStore("pdfs").put(v,k);t.oncomplete=res;t.onerror=function(){rej(t.error)}});return true}catch(e){return false}}
+async function idbGet(k){try{var d=await idb();return await new Promise(function(res,rej){var t=d.transaction("pdfs").objectStore("pdfs").get(k);t.onsuccess=function(){res(t.result)};t.onerror=function(){rej(t.error)}})}catch(e){return null}}
+async function sourceDoc(sid){
+  if(PDFS[sid])return PDFS[sid];
+  var rec=await idbGet(sid);
+  if(!rec||!rec.buf||!window.pdfjsLib)return null;
+  pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  PDFS[sid]=await pdfjsLib.getDocument({data:new Uint8Array(rec.buf.slice(0))}).promise;
+  return PDFS[sid];
+}
+function closeSource(){var m=$("#srcv");if(m)m.remove();sv=null}
+async function openSource(sid,page){
+  closeSource();
+  sv={sid:sid,page:page||1,zoom:1,doc:null,tok:0};
+  var m=document.createElement("div");m.className="modal src";m.id="srcv";
+  m.innerHTML='<div class="sv" role="dialog" aria-modal="true" aria-label="Source page"><div class="svh"><b>Source</b><span class="sp"></span><button class="btn" id="svp" aria-label="Previous page">‹</button><label class="srl" for="svn">Page</label><input id="svn" type="number" min="1" value="'+sv.page+'"><span id="svof" class="mono"></span><button class="btn" id="svnx" aria-label="Next page">›</button><button class="btn" id="svz1" aria-label="Zoom out">−</button><button class="btn" id="svz2" aria-label="Zoom in">+</button><button class="btn primary" id="svc">Close</button></div><div class="svb" id="svb"><p class="note" id="svm">Opening the source…</p></div></div>';
+  document.body.appendChild(m);
+  $("#svc").onclick=closeSource;
+  m.addEventListener("click",function(e){if(e.target===m)closeSource()});
+  $("#svp").onclick=function(){svGo(sv.page-1)};$("#svnx").onclick=function(){svGo(sv.page+1)};
+  $("#svn").onchange=function(){svGo(+$("#svn").value||1)};
+  $("#svz1").onclick=function(){sv.zoom=Math.max(.5,sv.zoom-.25);svRender()};
+  $("#svz2").onclick=function(){sv.zoom=Math.min(3,sv.zoom+.25);svRender()};
+  $("#svc").focus();
+  try{sv.doc=await sourceDoc(sid)}catch(e){sv.doc=null}
+  if(!sv)return;
+  if(!sv.doc)askSource();else svRender();
+}
+function askSource(){
+  var b=$("#svb");
+  b.innerHTML='<div class="svask"><p>This browser does not have the source PDF saved. Choose the same PDF once and its pages will open here from now on.</p><label class="btn primary" for="svf" style="display:inline-block">Choose PDF</label><input id="svf" type="file" accept="application/pdf" style="position:absolute;opacity:0;width:1px;height:1px"><p class="note">Questions imported from chat may quote printed page numbers. Use the Page box to jump if the page looks off.</p></div>';
+  $("#svf").onchange=async function(e){
+    var f=e.target.files[0];if(!f||!sv)return;
+    try{
+      var buf=await f.arrayBuffer();
+      await idbPut(sv.sid,{name:f.name,buf:buf.slice(0)});
+      delete PDFS[sv.sid];
+      pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      PDFS[sv.sid]=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+      sv.doc=PDFS[sv.sid];svRender();
+    }catch(err){$("#svb").innerHTML='<p class="note">Could not open that PDF. Try the original file.</p>'}
+  };
+}
+function svGo(p){if(!sv||!sv.doc)return;sv.page=p;svRender()}
+async function svRender(){
+  if(!sv||!sv.doc)return;
+  var d=sv.doc,tok=++sv.tok;
+  sv.page=Math.max(1,Math.min(sv.page,d.numPages));
+  $("#svn").value=sv.page;$("#svn").max=d.numPages;$("#svof").textContent="of "+d.numPages;
+  var pg=await d.getPage(sv.page),b=$("#svb");
+  if(!b||tok!==sv.tok)return;
+  var w=Math.max(260,b.clientWidth-24),v0=pg.getViewport({scale:1}),sc=(w/v0.width)*sv.zoom,dpr=window.devicePixelRatio||1;
+  var vp=pg.getViewport({scale:sc*dpr}),c=document.createElement("canvas");
+  c.width=vp.width;c.height=vp.height;c.style.width=(vp.width/dpr)+"px";c.style.height=(vp.height/dpr)+"px";
+  b.innerHTML="";b.appendChild(c);b.scrollTop=0;
+  await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+}
+
+/* ================= SETUP SCREEN ================= */
+function setupScreen(){
+  S.screen="setup";SU={mode:"pdf",pdf:null,name:"",pages:0};
+  var saved=null;try{saved=JSON.parse(lsGet("pdftest:last")||"null")}catch(e){}
+  var h='<div class="card start"><h1>Voice PDF Test Maker</h1><p class="sub">Upload a chapter. Gemini writes an UPPCS-style test from it. Take it on screen with a timer, or by voice with a spoken coach. You get your score, analysis and a revision plan at the end.</p>'+
+  keyCard()+revCard()+'<div class="seg" role="tablist"><button type="button" id="t-pdf" class="on">Upload PDF</button><button type="button" id="t-paste">Paste text</button><button type="button" id="t-json">Paste questions</button></div>'+
+  '<div id="src-pdf"><input id="file" type="file" accept="application/pdf,.pdf" style="display:none"><div class="drop" id="dropbtn" role="button" tabindex="0"><span id="dropt">Choose a PDF (text-based, ideally one chapter of about 10–30 pages)</span></div><div id="fileinfo" class="note"></div>'+
+  '<div class="row2"><label for="pf">Pages</label><input id="pf" type="number" min="1" value="1" disabled><label for="pt">to</label><input id="pt" type="number" min="1" value="1" disabled></div></div>'+
+  '<div id="src-paste" hidden><label for="paste" class="lbl">Chapter text</label><textarea id="paste" rows="8" placeholder="Paste the chapter text here"></textarea></div>'+'<div id="src-json" hidden><label for="jsonq" class="lbl">Questions as JSON (an array made by Claude in chat)</label><textarea id="jsonq" rows="8" placeholder=\'[{"type":"Direct","diff":"M","page":"p. 4","stem":["Who ...?"],"table":null,"options":["A","B","C","D"],"answer":1,"explanation":"..."}]\'></textarea></div>'+
+  '<div class="fields"><div><label for="title" class="lbl">Test name</label><input id="title" type="text" value=""></div>'+
+  '<div><label for="nq" class="lbl">Questions</label><select id="nq"><option value="10">10</option><option value="20">20</option><option value="30" selected>30</option></select></div>'+
+  '<div><label for="style" class="lbl">Exam style</label><select id="style"><option value="UPPCS Prelims">UPPCS Prelims</option><option value="BPSC Prelims">BPSC Prelims</option><option value="general State PCS Prelims (MPPCS, Uttarakhand PCS, RAS, Chhattisgarh PCS)">Other State PCS</option></select></div></div>'+
+  '<label class="chk"><input type="checkbox" id="hard"> Make it harder (about 40% hard questions)</label>'+
+  '<div class="btnrow"><button class="btn primary" id="gen" disabled style="padding:11px 26px;font-size:16px">Generate test</button><button class="btn" id="stop" hidden>Stop</button></div>'+
+  '<div id="prog" class="prog" hidden></div><div id="err" class="err" role="alert" hidden></div>'+
+  (saved&&saved.Q&&saved.Q.length?'<div class="resume"><span>Last test: <b>'+esc(saved.META.title)+'</b> · '+saved.Q.length+' questions</span><button class="btn" id="resume">Open it again</button></div>':'')+
+  '<p class="note">Questions are written by Gemini from your PDF only, and a second pass checks every answer key against the text. Dropped questions are counted. Gemini can still make mistakes, so use the source page references in the review to verify.</p></div>';
+  $("#app").innerHTML=h;
+  $("#t-pdf").onclick=function(){setMode("pdf")};$("#t-paste").onclick=function(){setMode("paste")};$("#t-json").onclick=function(){setMode("json")};
+  $("#jsonq").oninput=checkReady;
+  if($("#rdrill"))$("#rdrill").onclick=startDrill;if($("#rtl"))$("#rtl").onclick=timelineScreen;
+  $("#file").onchange=function(e){onFile(e.target.files[0])};
+  $("#dropbtn").onclick=function(){var f=$("#file");f.value="";f.click()};
+  $("#dropbtn").onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();$("#file").click()}};
+  $("#paste").oninput=checkReady;bindKey();
+  $("#gen").onclick=runGenerate;
+  $("#stop").onclick=function(){if(CTL)CTL.abort()};
+  if($("#resume"))$("#resume").onclick=function(){Q=saved.Q;META=saved.META;fresh();startScreen()};
+}
+function setMode(m){
+  SU.mode=m;
+  ["pdf","paste","json"].forEach(function(k){$("#t-"+k).classList.toggle("on",m===k);$("#src-"+k).hidden=m!==k});
+  $("#gen").textContent=m==="json"?"Import test":"Generate test";
+  checkReady();
+}
+function checkReady(){
+  var ok=SU.mode==="pdf"?!!SU.pdf:SU.mode==="paste"?($("#paste").value.trim().length>=300):($("#jsonq").value.trim().length>=20);
+  $("#gen").disabled=!ok||(SU.mode!=="json"&&!gkey());
+}
+function revCard(){
+  var st=bankStats();
+  if(!st.total)return "";
+  return '<div class="revcard"><div><b>Revision</b><span>'+st.due+' due today · '+st.tomorrow+' due tomorrow · '+st.total+' in the plan</span></div><div class="btnrow"><button class="btn primary" id="rdrill"'+(st.due?'':' disabled')+'>Revise now ('+st.due+')</button><button class="btn" id="rtl">Timeline</button></div></div>';
+}
+function runImport(){
+  showErr("");
+  var raw=$("#jsonq").value.trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim(),arr;
+  try{arr=JSON.parse(raw)}catch(e){showErr("That is not valid JSON. Paste the whole array exactly as it was given.");return}
+  if(!Array.isArray(arr))arr=(arr&&arr.questions)||[];
+  var qs=arr.map(normalise).filter(Boolean);
+  if(qs.length<3){showErr("Fewer than 3 valid questions found. Each needs type, stem, 4 options, answer (0 to 3) and explanation.");return}
+  var ttl=$("#title").value.trim()||"Imported test",isid="imp-"+hash(ttl);
+  qs.forEach(function(q){q.sid=isid});
+  Q=qs;
+  META={title:ttl,sid:isid,src:"Imported questions",dur:Math.round(qs.length*1.2)*60,note:qs.length<arr.length?(arr.length-qs.length)+" item(s) were skipped as invalid.":"",style:""};
+  lsSet("pdftest:last",JSON.stringify({META:META,Q:Q}));
+  fresh();startScreen();
+}
+function showErr(msg){var e=$("#err");e.textContent=msg;e.hidden=!msg}
+async function onFile(f){
+  showErr("");
+  if(!f)return;
+  var info=$("#fileinfo");info.textContent="Reading "+f.name+"…";SU.pdf=null;checkReady();
+  try{
+    if(!window.pdfjsLib)throw new Error("pdf.js did not load");
+    pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    var buf=await f.arrayBuffer();
+    SU.buf=buf.slice(0);SU.srcId="pdf-"+hash(f.name+":"+buf.byteLength);
+    var doc=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+    SU.pdf=doc;SU.pages=doc.numPages;SU.name=f.name;
+    var probe="";
+    for(var p=1;p<=Math.min(3,doc.numPages);p++){var pg=await doc.getPage(p);var tc=await pg.getTextContent();probe+=tc.items.map(function(i){return i.str}).join(" ")}
+    $("#pf").disabled=false;$("#pt").disabled=false;
+    $("#pf").max=doc.numPages;$("#pt").max=doc.numPages;$("#pf").value=1;$("#pt").value=doc.numPages;
+    $("#dropt").textContent=f.name;
+    if(!$("#title").value)$("#title").value=f.name.replace(/\.pdf$/i,"").replace(/[-_]+/g," ").replace(/\s+/g," ").trim();
+    info.textContent=doc.numPages+" pages"+(probe.replace(/\s/g,"").length<60?". This PDF has almost no readable text (it may be scanned). Use the Paste text tab instead.":". Ready.");
+  }catch(e){
+    info.textContent="";
+    showErr("Could not read that PDF in the browser. Try the Paste text tab, or export the chapter as a text-based PDF. ("+(e&&e.message||"error")+")");
+  }
+  checkReady();
+}
+async function extractText(from,to){
+  var out=[];
+  for(var p=from;p<=to;p++){
+    var pg=await SU.pdf.getPage(p),tc=await pg.getTextContent();
+    var s=tc.items.map(function(it){return it.str+(it.hasEOL?"\n":" ")}).join("").replace(/[ \t]+/g," ").replace(/\n\s*\n+/g,"\n").trim();
+    out.push("[PDF page "+p+"]\n"+s);
+  }
+  return out.join("\n\n");
+}
+
+/* ================= GENERATION ================= */
+var STEPS=[];
+function drawSteps(){
+  var p=$("#prog");p.hidden=false;
+  p.innerHTML=STEPS.map(function(s){return '<div class="stp '+s.s+'"><span class="dot"></span>'+esc(s.t)+'</div>'}).join("");
+}
+function step(i,t,s){STEPS[i]={t:t,s:s};drawSteps()}
+function plan(n){
+  var raw=TYPES.map(function(t){return {t:t,x:SHARE[t]*n}}),got={},tot=0;
+  raw.forEach(function(r){got[r.t]=Math.floor(r.x);tot+=got[r.t]});
+  raw.sort(function(a,b){return (b.x-Math.floor(b.x))-(a.x-Math.floor(a.x))});
+  for(var i=0;tot<n;i++,tot++)got[raw[i%raw.length].t]++;
+  return got;
+}
+function genPrompt(source,counts,style,hard,asked){
+  var list=TYPES.filter(function(t){return counts[t]>0}).map(function(t){return counts[t]+" x "+t}).join(", ");
+  return [
+"You are a senior "+style+" paper-setter (GS Paper 1, History) with 15+ years of experience. Write MCQs from the SOURCE TEXT below.",
+"",
+"SOURCE RULES",
+"1. Every fact in a question, option and explanation must come from the SOURCE TEXT. Do not add facts from memory. If a good question would need outside facts, skip it.",
+"2. Skip any date, name or figure that is ambiguous, or that the text itself states two ways.",
+"3. In \"page\" write the page where the fact appears as \"PDF p. N\", using the [PDF page N] markers. For pasted text without markers write \"text\".",
+"",
+"LEVEL",
+"- Ask specific details (who, when, where, under what condition, in what order), not headline facts.",
+"- Wrong options must be plausible: same era, same category, nearby years or names from the same text.",
+"- Exactly one option is correct. Do not use \"all of the above\" or \"none of the above\".",
+"- When the text mentions people or places of UP, Bihar, MP, Rajasthan, Uttarakhand, Chhattisgarh or Jharkhand, use some of them.",
+"- Do not test any fact listed under ALREADY ASKED.",
+"",
+"QUESTIONS TO WRITE (exactly these counts): "+list,
+"Formats:",
+"- Statement: stem[0] is the topic sentence, then 2 or 3 numbered statements (\"1. ...\", \"2. ...\"). Plant one subtle error in one statement (wrong year, reversed cause, wrong person, right event in wrong context), or make all correct. Options such as \"1 and 2 only\" or \"Only 1\", \"Both 1 and 2\", \"Neither 1 nor 2\".",
+"- Chronology: stem is [\"Arrange in chronological order:\",\"I. ...\",\"II. ...\",\"III. ...\",\"IV. ...\"]. Events must be dated in the text and belong to one theme. Options are four orderings such as \"II, I, IV, III\".",
+"- Match: stem is [\"Match List-I with List-II:\"] and table is {\"h\":[\"List-I\",\"List-II\"],\"r\":[[\"A. ..\",\"1. ..\"],[\"B. ..\",\"2. ..\"],[\"C. ..\",\"3. ..\"],[\"D. ..\",\"4. ..\"]]}. Options such as \"A-2, B-1, C-4, D-3\". All pairs from one category, at least one trap pair, and the four options must overlap.",
+"- Negative: ask which statement is NOT correct (or EXCEPT, or NOT correctly matched). Three options true, one false.",
+"- Direct: who, which, first, when or where, with one specific answer.",
+"- Assertion-Reason: stem is [\"A: ...\",\"R: ...\"] and options are exactly "+JSON.stringify(AR_OPTS)+".",
+"Difficulty across this batch: about "+(hard?"20% E, 40% M, 40% H":"30% E, 50% M, 20% H")+". E = direct recall, M = two-statement, match or chronology, H = close options and subtle wording.",
+"Explanation: Hinglish (Hindi and English in Roman script), 2 or 3 short lines saying why the answer is right and what the trap was. Use only facts from the text.",
+"",
+"OUTPUT: return ONLY a JSON array, no markdown fences and no commentary. Each item:",
+"{\"type\":\"Statement|Chronology|Match|Negative|Direct|Assertion-Reason\",\"diff\":\"E|M|H\",\"page\":\"PDF p. N\",\"stem\":[\"line\",\"line\"],\"table\":null,\"options\":[\"..\",\"..\",\"..\",\"..\"],\"answer\":0,\"explanation\":\"..\"}",
+"\"answer\" is the 0-based index of the correct option. Options carry no \"(a)\" prefix. \"table\" is null except for Match.",
+"",
+"ALREADY ASKED:",
+asked.length?asked.map(function(a){return "- "+a}).join("\n"):"(nothing yet)",
+"",
+"SOURCE TEXT:",
+source].join("\n");
+}
+function verifyPrompt(source,qs){
+  var items=qs.map(function(q,i){return {i:i,type:q.t,stem:q.s,table:q.tb||null,options:q.o,answer:q.a}});
+  return [
+"You are checking MCQs against their source. For each question decide whether the marked answer is correct according to the SOURCE TEXT alone.",
+"Mark ok=false when: the text does not support the marked answer; more than one option is defensible; a fact in the question or options contradicts the text; the wording is ambiguous.",
+"OUTPUT: ONLY a JSON array with one object per question: {\"i\":0,\"ok\":true,\"issue\":\"\"}. Give a short issue only when ok is false.",
+"",
+"QUESTIONS:",JSON.stringify(items),
+"",
+"SOURCE TEXT:",source].join("\n");
+}
+function normalise(r){
+  if(!r||typeof r!=="object")return null;
+  var t=TYPES.filter(function(x){return x.toLowerCase()===String(r.type||"").toLowerCase()})[0];
+  if(!t)return null;
+  var s=Array.isArray(r.stem)?r.stem:String(r.stem||"").split("\n");
+  s=s.map(function(x){return String(x).trim()}).filter(Boolean);
+  var o=Array.isArray(r.options)?r.options.map(function(x){return String(x).replace(/^\(?[a-dA-D][\).]\s+/,"").trim()}):[];
+  var a=parseInt(r.answer,10);
+  if(!s.length||o.length!==4||!(a>=0&&a<=3)||!r.explanation)return null;
+  if(t==="Assertion-Reason")o=AR_OPTS.slice();
+  var tb=null;
+  if(t==="Match"){
+    if(!r.table||!Array.isArray(r.table.r)||r.table.r.length<2)return null;
+    tb={h:(r.table.h&&r.table.h.length===2)?r.table.h.map(String):["List-I","List-II"],r:r.table.r.map(function(x){return [String(x[0]),String(x[1])]})};
+  }
+  var q={t:t,d:/^[EMH]$/.test(r.diff)?r.diff:"M",p:String(r.page||"source"),s:s,o:o,a:a,e:String(r.explanation).trim()};
+  if(tb)q.tb=tb;
+  return q;
+}
+function mixOptions(q){
+  if(["Direct","Negative","Chronology","Match"].indexOf(q.t)<0)return q;
+  if(q.o.some(function(x){return /\b(Both|Neither|Only|All of|None of)\b/.test(x)}))return q;
+  var idx=shuffle([0,1,2,3]);
+  var no=idx.map(function(i){return q.o[i]});
+  q.a=idx.indexOf(q.a);q.o=no;return q;
+}
+async function runGenerate(){
+  showErr("");
+  if(SU.mode==="json"){runImport();return}
+  var nq=+$("#nq").value,style=$("#style").value,hard=$("#hard").checked,title=$("#title").value.trim()||"Practice test";
+  var from=+$("#pf").value,to=+$("#pt").value,pasted=$("#paste").value.trim();
+  var sample={};
+  if(!gkey()){showErr(errCopy({code:"nokey"}));return}
+  $("#gen").disabled=true;$("#stop").hidden=false;
+  CTL=new AbortController();
+  STEPS=[];step(0,"Reading the source","on");
+  try{
+    var source,srcLabel;
+    if(SU.mode==="pdf"){
+      from=Math.max(1,Math.min(from||1,SU.pages));to=Math.max(from,Math.min(to||SU.pages,SU.pages));
+      source=await extractText(from,to);srcLabel=SU.name+" · pp. "+from+"–"+to;
+    }else{source=pasted;srcLabel="Pasted text"}
+    if(source.replace(/\s/g,"").length<300)throw {code:"x",message:"The source has too little text to write questions from."};
+    if(source.length>MAXCHARS)throw {code:"x",message:"That range has about "+Math.round(source.length/1000)+"k characters. Narrow it to roughly 25 pages and try again."};
+    step(0,"Read "+Math.round(source.length/1000)+"k characters of source","ok");
+    var nB=Math.ceil(nq/10),counts=plan(nq),pool=[];
+    TYPES.forEach(function(t){for(var i=0;i<counts[t];i++)pool.push(t)});
+    var batches=[];for(var b=0;b<nB;b++)batches.push({});
+    pool.forEach(function(t,i){var B=batches[i%nB];B[t]=(B[t]||0)+1});
+    var all=[],dropped=0,asked=[];
+    for(var b=0;b<nB;b++){
+      var want=batches[b],wantN=Object.keys(want).reduce(function(a,k){return a+want[k]},0);
+      step(1+b*2,"Writing questions, batch "+(b+1)+" of "+nB,"on");
+      var raw=await ask(sample,genPrompt(source,want,style,hard,asked),CTL.signal);
+      if(!Array.isArray(raw))raw=[];
+      var qs=raw.map(normalise).filter(Boolean).slice(0,wantN+2);
+      if(!qs.length)throw {code:"x",message:"Gemini returned no usable questions for batch "+(b+1)+"."};
+      step(1+b*2,"Wrote "+qs.length+" questions, batch "+(b+1)+" of "+nB,"ok");
+      step(2+b*2,"Checking answers against the text, batch "+(b+1)+" of "+nB,"on");
+      var ver=[];
+      try{ver=await ask(sample,verifyPrompt(source,qs),CTL.signal)}catch(e){if(e&&(e.code==="cancelled"||e.code==="badkey"||e.code==="nokey"||e.code==="nomodel"||e.code==="rate_limited"))throw e;ver=[]}
+      var bad={};
+      (Array.isArray(ver)?ver:[]).forEach(function(v){if(v&&v.ok===false)bad[v.i]=true});
+      var kept=qs.filter(function(q,i){return !bad[i]});
+      dropped+=qs.length-kept.length;
+      kept.forEach(function(q){asked.push(q.s[0].slice(0,110))});
+      all=all.concat(kept);
+      step(2+b*2,"Checked batch "+(b+1)+": kept "+kept.length+" of "+qs.length,"ok");
+    }
+    if(all.length<3)throw {code:"x",message:"Too few questions passed the answer check. Try a longer or clearer page range."};
+    shuffle(all);all=all.map(mixOptions);
+    var sid=null;
+    if(SU.mode==="pdf"&&SU.buf){
+      sid=SU.srcId;PDFS[sid]=SU.pdf;
+      await idbPut(sid,{name:SU.name,buf:SU.buf});
+      all.forEach(function(q){q.sid=sid});
+    }
+    Q=all;
+    META={title:title,src:srcLabel,dur:Math.round(all.length*1.2)*60,note:dropped?dropped+" question"+(dropped>1?"s were":" was")+" dropped by the answer check.":"",style:style,sid:sid};
+    lsSet("pdftest:last",JSON.stringify({META:META,Q:Q}));
+    fresh();CTL=null;startScreen();
+  }catch(e){
+    CTL=null;
+    showErr(e&&e.code==="x"?e.message:errCopy(e));
+    $("#gen").disabled=false;$("#stop").hidden=true;
+    STEPS=STEPS.map(function(s){return s.s==="on"?{t:s.t,s:"bad"}:s});drawSteps();
+  }
+}
+
+/* ================= TEST ENGINE ================= */
+function fresh(){S={screen:"start",i:0,ans:Q.map(function(){return null}),vis:Q.map(function(){return false}),mrk:Q.map(function(){return false}),tm:Q.map(function(){return 0}),left:META.dur,start:0,last:0,filter:"all",timer:null,palOpen:false,modal:false,took:0}}
+function stemHTML(q){
+  var h='<div class="stem">';
+  q.s.forEach(function(line){var isSt=/^(\d\.|[IV]+\.)\s/.test(line);h+='<p'+(isSt?' class="st"':'')+'>'+esc(line)+'</p>'});
+  h+='</div>';
+  if(q.tb){
+    h+='<div class="tbl"><table><thead><tr><th>'+esc(q.tb.h[0])+'</th><th>'+esc(q.tb.h[1])+'</th></tr></thead><tbody>';
+    q.tb.r.forEach(function(r){h+='<tr><td>'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'});
+    h+='</tbody></table></div>';
+  }
+  return h;
+}
+function optsHTML(q,idx,review){
+  var h='<div class="opts" role="radiogroup" aria-label="Options">';
+  q.o.forEach(function(t,k){
+    var cls="opt";
+    if(review){cls+=" ro";if(k===q.a)cls+=" ok";else if(S.ans[idx]===k)cls+=" no"}
+    else if(S.ans[idx]===k)cls+=" sel";
+    h+='<button type="button" class="'+cls+'" data-k="'+k+'" role="radio" aria-checked="'+(S.ans[idx]===k)+'"'+(review?' disabled':'')+'><span class="k">'+L[k]+'</span><span class="t">'+esc(t)+'</span></button>';
+  });
+  return h+'</div>';
+}
+function counts(){
+  var m=0;
+  for(var i=0;i<Q.length;i++)if(S.mrk[i])m++;
+  var answered=S.ans.filter(function(x){return x!==null}).length;
+  return {answered:answered,unans:Q.length-answered,marked:m,nv:S.vis.filter(function(v){return !v}).length};
+}
+function palClass(i){var ans=S.ans[i]!==null,mk=S.mrk[i];if(ans&&mk)return"am";if(mk)return"mk";if(ans)return"an";if(S.vis[i])return"na";return""}
+function legendHTML(){return '<div class="legend"><span><i style="background:var(--bg);border:1.5px solid var(--line)"></i>Not visited</span><span><i style="background:var(--bad-soft);border:1.5px solid var(--bad)"></i>Not answered</span><span><i style="background:var(--good-soft);border:1.5px solid var(--good)"></i>Answered</span><span><i style="background:var(--mark-soft);border:1.5px solid var(--mark);border-radius:50%"></i>Marked for review</span></div>'}
+function startScreen(){
+  S.screen="start";
+  var n=Q.length;
+  $("#app").innerHTML='<div class="card start"><h1>'+esc(META.title)+'</h1><p class="sub">'+esc(META.src)+(META.style?' · '+esc(META.style):'')+'</p>'+
+  '<div class="meta"><div><small>Questions</small><strong>'+n+'</strong></div><div><small>Time</small><strong>'+Math.round(META.dur/60)+' min</strong></div><div><small>Correct</small><strong>+1</strong></div><div><small>Wrong</small><strong>−0.33</strong></div></div>'+
+  (META.note?'<p class="note">'+esc(META.note)+'</p>':'')+
+  '<ul class="rules"><li>Pick an option to answer. Tap it again to clear it.</li><li>Mark for review keeps a question flagged on the palette. A marked question that is also answered still counts when you submit.</li><li>The test submits itself when the timer reaches zero.</li><li>Shortcuts: A–D choose an option, ← → move between questions.</li></ul>'+
+  legendHTML()+'<div class="btnrow"><button class="btn primary" id="go" style="padding:11px 26px;font-size:16px">Start test</button><button class="btn" id="voice">Voice quiz (speak answers)</button><button class="btn" id="newt">'+(META.rev?'Back to home':'New test from another PDF')+'</button></div></div>';
+  $("#go").onclick=beginTest;$("#voice").onclick=voiceScreen;$("#newt").onclick=setupScreen;
+}
+function beginTest(){
+  S.screen="test";S.start=Date.now();S.last=Date.now();S.vis[0]=true;
+  S.timer=setInterval(tick,1000);renderTest();
+}
+function tick(){
+  S.left=META.dur-Math.round((Date.now()-S.start)/1000);
+  var el=$("#tm");
+  if(el){el.textContent=fmt(S.left);el.classList.toggle("low",S.left<=300)}
+  if(S.left<=0)submit(true);
+}
+function bank(){var n=Date.now();S.tm[S.i]+=(n-S.last)/1000;S.last=n}
+function renderTest(){
+  var q=Q[S.i],c=counts();
+  var h='<div class="top"><div class="brand"><b>'+esc(META.title)+'</b><span>'+esc(META.src)+'</span></div><button class="btn pbtn" id="pal-open">Palette</button><div class="timer" id="tm">'+fmt(S.left)+'</div><button class="btn primary" id="sub">Submit</button></div>';
+  h+='<div class="grid"><div class="card qcard"><div class="qhead"><span class="qnum">Question '+(S.i+1)+' of '+Q.length+'</span><span class="tag">'+q.t+'</span>'+(S.mrk[S.i]?'<span class="tag" style="color:var(--mark);border-color:var(--mark)">Marked</span>':'')+'</div>'+
+  '<div class="qbody">'+stemHTML(q)+optsHTML(q,S.i,false)+'</div>'+
+  '<div class="actions"><button class="btn" id="prev"'+(S.i===0?' disabled':'')+'>Previous</button><button class="btn mk" id="mark">'+(S.mrk[S.i]?'Unmark':'Mark for review')+'</button><button class="btn" id="clr"'+(S.ans[S.i]===null?' disabled':'')+'>Clear</button><span class="sp"></span><button class="btn primary" id="next">'+(S.i===Q.length-1?'Save':'Save &amp; next')+'</button></div></div>'+
+  '<div class="scrim" id="scrim"'+(S.palOpen?'':' hidden')+'></div><aside class="card side'+(S.palOpen?' open':'')+'" aria-label="Question palette"><h2>Question palette</h2><div class="pal" id="pal">';
+  for(var i=0;i<Q.length;i++)h+='<button type="button" class="pb '+palClass(i)+(i===S.i?' cur':'')+'" data-i="'+i+'" aria-label="Question '+(i+1)+'">'+(i+1)+'</button>';
+  h+='</div><div class="counts"><span>Answered <b>'+c.answered+'</b></span><span>Not answered <b>'+c.unans+'</b></span><span>Marked <b>'+c.marked+'</b></span><span>Not visited <b>'+c.nv+'</b></span></div><button class="btn danger" id="sub2">Submit test</button></aside></div>';
+  $("#app").innerHTML=h;bindTest();
+}
+function go(i){bank();S.i=i;S.vis[i]=true;S.palOpen=false;renderTest();window.scrollTo({top:0})}
+function bindTest(){
+  document.querySelectorAll(".opt").forEach(function(b){b.onclick=function(){var k=+b.dataset.k;S.ans[S.i]=(S.ans[S.i]===k)?null:k;renderTest()}});
+  document.querySelectorAll(".pb").forEach(function(b){b.onclick=function(){go(+b.dataset.i)}});
+  $("#prev").onclick=function(){if(S.i>0)go(S.i-1)};
+  $("#next").onclick=function(){if(S.i<Q.length-1)go(S.i+1);else renderTest()};
+  $("#mark").onclick=function(){S.mrk[S.i]=!S.mrk[S.i];renderTest()};
+  $("#clr").onclick=function(){S.ans[S.i]=null;renderTest()};
+  $("#sub").onclick=confirmSubmit;$("#sub2").onclick=confirmSubmit;
+  $("#pal-open").onclick=function(){S.palOpen=true;renderTest()};
+  $("#scrim").onclick=function(){S.palOpen=false;renderTest()};
+}
+function confirmSubmit(){
+  var c=counts();
+  var m=document.createElement("div");m.className="modal";m.id="modal";
+  m.innerHTML='<div class="box" role="dialog" aria-modal="true" aria-labelledby="mt"><h3 id="mt">Submit the test?</h3><table class="sumtbl"><tr><td>Answered</td><td>'+c.answered+'</td></tr><tr><td>Not answered</td><td>'+c.unans+'</td></tr><tr><td>Marked for review</td><td>'+c.marked+'</td></tr><tr><td>Time left</td><td>'+fmt(S.left)+'</td></tr></table><div class="row"><button class="btn" id="mno">Keep working</button><button class="btn danger" id="myes">Submit now</button></div></div>';
+  document.body.appendChild(m);S.modal=true;
+  $("#mno").onclick=closeModal;$("#myes").onclick=function(){closeModal();submit(false)};
+  $("#mno").focus();
+}
+function closeModal(){var m=$("#modal");if(m)m.remove();S.modal=false}
+function submit(auto){
+  if(S.screen!=="test")return;
+  bank();clearInterval(S.timer);closeModal();
+  S.took=Math.min(META.dur,Math.round((Date.now()-S.start)/1000));
+  S.screen="result";S.filter="all";S.auto=auto;
+  if(!S.banked){
+    S.banked=true;
+    if(META.rev){S.revRes=reviewed(Q.map(function(q,i){return {id:META.rev[i],ok:S.ans[i]===q.a}}))}
+    else{var miss=Q.filter(function(q,i){return S.ans[i]!==q.a});S.nmiss=miss.length;if(miss.length)missed(miss,META.title)}
+  }
+  renderResult();window.scrollTo({top:0});
+}
+function grade(){
+  var r={c:0,w:0,s:0,by:{},dy:{}};
+  Q.forEach(function(q,i){
+    var st=S.ans[i]===null?"s":(S.ans[i]===q.a?"c":"w");
+    r[st]++;
+    [["by",q.t],["dy",q.d]].forEach(function(p){var o=r[p[0]][p[1]]||(r[p[0]][p[1]]={c:0,w:0,s:0,n:0});o[st]++;o.n++});
+  });
+  r.score=r.c*POS-r.w*NEG;r.acc=(r.c+r.w)?Math.round(100*r.c/(r.c+r.w)):0;
+  return r;
+}
+function srcRef(q){
+  if(!q.sid)return 'Source: '+esc(q.p);
+  var m=String(q.p).match(/(\d+)/),pg=m?+m[1]:1;
+  return '<button type="button" class="btn srcbtn" data-sid="'+esc(q.sid)+'" data-page="'+pg+'">Open source page'+(m?' ('+esc(q.p)+')':'')+'</button>';
+}
+function renderResult(){
+  var g=grade(),total=Q.length*POS;
+  var h='<div class="card res"><h1>Test result</h1><p class="yr">'+esc(META.title)+' · '+(S.auto?'Time was up, so the test was submitted automatically.':'Submitted')+'</p>'+
+  '<div class="score"><div class="big">'+g.score.toFixed(2)+'<small> / '+total.toFixed(0)+'</small></div><div class="tiles"><div class="tile g"><small>Correct</small><strong>'+g.c+'</strong></div><div class="tile b"><small>Wrong</small><strong>'+g.w+'</strong></div><div class="tile w"><small>Skipped</small><strong>'+g.s+'</strong></div><div class="tile"><small>Accuracy</small><strong>'+g.acc+'%</strong></div><div class="tile"><small>Time taken</small><strong>'+fmt(S.took)+'</strong></div></div></div>'+
+  '<p class="yr">Marking: +1 for each correct answer, −0.33 for each wrong answer, 0 for skipped.</p>'+revPanel()+
+  '<div class="bdwrap"><table class="bd"><thead><tr><th>Question type</th><th>Correct / total</th><th>Wrong</th><th>Skipped</th><th>Accuracy</th></tr></thead><tbody>';
+  Object.keys(g.by).forEach(function(k){var o=g.by[k];h+='<tr><td>'+k+'</td><td>'+o.c+' / '+o.n+'</td><td>'+o.w+'</td><td>'+o.s+'</td><td><div class="bar"><i style="width:'+Math.round(100*o.c/o.n)+'%"></i></div></td></tr>'});
+  h+='</tbody></table></div><div class="bdwrap"><table class="bd"><thead><tr><th>Difficulty</th><th>Correct / total</th><th>Wrong</th><th>Skipped</th><th>Accuracy</th></tr></thead><tbody>';
+  ["E","M","H"].forEach(function(k){var o=g.dy[k];if(!o)return;h+='<tr><td>'+DN[k]+'</td><td>'+o.c+' / '+o.n+'</td><td>'+o.w+'</td><td>'+o.s+'</td><td><div class="bar"><i style="width:'+Math.round(100*o.c/o.n)+'%"></i></div></td></tr>'});
+  h+='</tbody></table></div><div class="filters" role="group" aria-label="Filter questions">';
+  [["all","All "+Q.length],["wrong","Wrong ("+g.w+")"],["skip","Skipped ("+g.s+")"],["right","Correct ("+g.c+")"],["marked","Marked ("+S.mrk.filter(Boolean).length+")"]].forEach(function(f){h+='<button class="chip'+(S.filter===f[0]?' on':'')+'" data-f="'+f[0]+'">'+f[1]+'</button>'});
+  h+='<span style="flex:1"></span>'+(META.rev?'':'<button class="btn" id="retake">Retake test</button>')+'<button class="btn" id="newt2">'+(META.rev?'Back to home':'New test from another PDF')+'</button></div></div><div id="rv"></div>';
+  $("#app").innerHTML=h;
+  document.querySelectorAll(".chip").forEach(function(b){b.onclick=function(){S.filter=b.dataset.f;renderResult()}});
+  if($("#retake"))$("#retake").onclick=function(){fresh();startScreen();window.scrollTo({top:0})};
+  if($("#tl"))$("#tl").onclick=timelineScreen;
+  $("#newt2").onclick=function(){setupScreen();window.scrollTo({top:0})};
+  var out="";
+  Q.forEach(function(q,i){
+    var st=S.ans[i]===null?"s":(S.ans[i]===q.a?"c":"w");
+    var show=S.filter==="all"||(S.filter==="wrong"&&st==="w")||(S.filter==="skip"&&st==="s")||(S.filter==="right"&&st==="c")||(S.filter==="marked"&&S.mrk[i]);
+    if(!show)return;
+    var vt=st==="c"?'<span class="verdict c">Correct +1</span>':st==="w"?'<span class="verdict w">Wrong −0.33</span>':'<span class="verdict s">Skipped</span>';
+    var yours=S.ans[i]===null?'You did not answer this one.':'Your answer: <b>('+L[S.ans[i]]+')</b> · Correct answer: <b>('+L[q.a]+')</b>';
+    out+='<div class="card qcard rv"><div class="qhead"><span class="qnum">Q'+(i+1)+'</span><span class="tag">'+q.t+'</span><span class="tag '+q.d+'">'+DN[q.d]+'</span>'+(S.mrk[i]?'<span class="tag" style="color:var(--mark);border-color:var(--mark)">Marked</span>':'')+'<span class="tag mono">'+fmt(S.tm[i])+'</span>'+vt+'</div><div class="qbody">'+stemHTML(q)+optsHTML(q,i,true)+'<div class="exp"><p>'+yours+'</p><p>'+esc(q.e)+'</p><p class="ref">'+srcRef(q)+'</p></div></div></div>';
+  });
+  $("#rv").innerHTML=out||'<div class="card">No questions in this filter.</div>';
+  document.querySelectorAll(".srcbtn").forEach(function(b){b.onclick=function(){openSource(b.dataset.sid,+b.dataset.page||1)}});
+}
+document.addEventListener("keydown",function(e){
+  if(sv&&e.key==="Escape"){closeSource();return}
+  if(sv)return;
+  if(S.screen!=="test"||S.modal)return;
+  var k=e.key.toLowerCase(),i=L.indexOf(k);
+  if(k.length===1&&i>-1){S.ans[S.i]=(S.ans[S.i]===i)?null:i;renderTest()}
+  else if(e.key==="ArrowRight"&&S.i<Q.length-1)go(S.i+1);
+  else if(e.key==="ArrowLeft"&&S.i>0)go(S.i-1);
+});
+/* ================= GEMINI SETTINGS + TEXT GENERATION ================= */
+var GK={key:"gq:key",tm:"gq:tmodel",lm:"gq:lmodel",ws:"gq:ws"};
+var DEF_TM="gemini-2.5-flash",DEF_LM="gemini-3.1-flash-live-preview";
+function gkey(){return (lsGet(GK.key)||"").trim()}
+function tmodel(){return (lsGet(GK.tm)||DEF_TM).trim()}
+function lmodel(){return (lsGet(GK.lm)||DEF_LM).trim()}
+function keyCard(){
+  return '<details class="setbox"'+(gkey()?'':' open')+'><summary><b>Gemini API key</b> <span id="kst" class="kst">'+(gkey()?'saved in this browser':'not set')+'</span></summary>'+
+  '<p class="note" style="margin:8px 0">Paste your free key from Google AI Studio. It is stored only in this browser and is sent only to Google.</p>'+
+  '<label class="lbl" for="gkey">API key</label><input id="gkey" type="password" autocomplete="off" placeholder="Paste your Gemini API key here" value="'+esc(gkey())+'">'+
+  '<div class="fields"><div><label class="lbl" for="tmodel">Question-writing model</label><input id="tmodel" type="text" value="'+esc(tmodel())+'"></div>'+
+  '<div><label class="lbl" for="lmodel">Live voice model</label><input id="lmodel" type="text" value="'+esc(lmodel())+'"></div></div>'+
+  '<div class="btnrow"><button class="btn primary" id="ksave" type="button">Save</button><button class="btn" id="kclear" type="button">Remove key</button></div></details>';
+}
+function bindKey(){
+  var s=$("#ksave");if(!s)return;
+  s.onclick=function(){
+    lsSet(GK.key,$("#gkey").value.trim());lsSet(GK.tm,$("#tmodel").value.trim()||DEF_TM);lsSet(GK.lm,$("#lmodel").value.trim()||DEF_LM);
+    $("#kst").textContent=gkey()?"saved in this browser":"not set";checkReady();
+  };
+  $("#kclear").onclick=function(){lsSet(GK.key,"");$("#gkey").value="";$("#kst").textContent="not set";checkReady()};
+}
+async function gemJson(prompt,signal){
+  var key=gkey();if(!key)throw {code:"nokey"};
+  var url="https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(tmodel())+":generateContent",res;
+  try{res=await fetch(url,{method:"POST",signal:signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",temperature:0.4}})})}
+  catch(e){if(e&&e.name==="AbortError")throw {code:"cancelled"};throw {code:"network"}}
+  if(!res.ok){
+    var t="";try{t=(await res.json()).error.message||""}catch(e){}
+    var c=res.status===429?"rate_limited":(res.status===403||(res.status===400&&/api key/i.test(t)))?"badkey":res.status===404?"nomodel":"http";
+    throw {code:c,message:String(t).slice(0,160),status:res.status};
+  }
+  var j=await res.json(),parts=((((j.candidates||[])[0]||{}).content||{}).parts)||[];
+  var txt=parts.map(function(p){return p.text||""}).join("").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  try{return JSON.parse(txt)}catch(e){throw {code:"invalid_json"}}
+}
+async function ask(sample,prompt,signal){
+  try{return await gemJson(prompt,signal)}
+  catch(e){if(e&&e.code==="invalid_json")return await gemJson(prompt,signal);throw e}
+}
+function errCopy(e){
+  var c=e&&e.code;
+  if(c==="nokey")return "Add your Gemini API key first (the box at the top).";
+  if(c==="badkey")return "Google rejected the API key. Check that it is copied fully and that the Gemini API is enabled for it.";
+  if(c==="nomodel")return "That model name was not found. Change the question-writing model in the key box (for example gemini-2.5-flash).";
+  if(c==="rate_limited")return "Gemini free-tier limit reached for now. Wait a minute and press Generate again.";
+  if(c==="network")return "Could not reach Google. Check the internet connection and try again.";
+  if(c==="cancelled")return "Stopped.";
+  return "Gemini could not finish this step"+(e&&e.message?" ("+e.message+")":"")+". Press Generate to try again.";
+}
+
+/* ================= CALENDAR WITHOUT CLAUDE ================= */
+function saveBlob(name,data,type){
+  var b=new Blob([data],{type:type||"text/plain"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1500);
+}
+function icsStamp(d,tv,add){
+  var p=d.split("-"),h=tv.split(":"),dt=new Date(+p[0],+p[1]-1,+p[2],+h[0],+h[1]+add);
+  return dt.getFullYear()+pad(dt.getMonth()+1)+pad(dt.getDate())+"T"+pad(dt.getHours())+pad(dt.getMinutes())+"00";
+}
+function icsText(s){return String(s).replace(/[\;,]/g,"\\$&").replace(/\r?\n/g,"\\n")}
+function calFallback(tv){
+  var by=planByDate(),dates=Object.keys(by).sort();
+  if(!dates.length){calMsg("Nothing to schedule yet.");return}
+  var now=new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+  var L2=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Voice PDF Test Maker//EN","CALSCALE:GREGORIAN"],links="";
+  dates.forEach(function(d){
+    var o=by[d],st=icsStamp(d,tv,0),en=icsStamp(d,tv,30);
+    var title="Revise "+o.n+" missed MCQ"+(o.n>1?"s":""),desc=o.n+" missed question"+(o.n>1?"s":"")+" due. From: "+o.src.join(", ")+". Open Voice PDF Test Maker, then Revision.";
+    L2.push("BEGIN:VEVENT","UID:rev-"+d+"-"+hash(desc)+"@voicepdftest","DTSTAMP:"+now,"DTSTART:"+st,"DTEND:"+en,"SUMMARY:"+icsText(title),"DESCRIPTION:"+icsText(desc),"BEGIN:VALARM","TRIGGER:-PT10M","ACTION:DISPLAY","DESCRIPTION:"+icsText(title),"END:VALARM","END:VEVENT");
+    links+='<li><a target="_blank" rel="noopener" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(title)+'&dates='+st+'/'+en+'&details='+encodeURIComponent(desc)+'">'+esc(niceDate(d))+' · '+o.n+' question'+(o.n>1?'s':'')+'</a></li>';
+  });
+  L2.push("END:VCALENDAR");
+  var box=$("#clinks");if(!box){box=document.createElement("div");box.id="clinks";$("#cmsg").after(box)}
+  box.innerHTML='<div class="btnrow" style="margin:8px 0"><button class="btn primary" id="icsbtn" type="button">Download all as calendar file (.ics)</button></div><p class="note">Or tap a date to open it already filled in Google Calendar, then press Save:</p><ul class="callinks">'+links+'</ul>';
+  $("#icsbtn").onclick=function(){saveBlob("revision-plan.ics",L2.join("\r\n"),"text/calendar")};
+  calMsg("Events are set for "+tv+" with a 10 minute reminder. Choose a way below.");
+}
+
+/* ================= VOICE QUIZ (Gemini Live) ================= */
+var V=null;
+var VSYS=[
+"You are a calm spoken quiz host for an Indian State PCS (UPPSC) aspirant named Prakriti. The app gives you ONE question at a time as text.",
+"1. Read the question aloud exactly as given, including the options A to D, at a natural pace. Do not add facts or hints. Then wait silently for the answer.",
+"2. When the user answers, call record_answer with the question number and choice. Accept A, B, C, D, first, second, third, fourth, or the option's own words, in Hindi or English. If the user says skip, pass or next, call record_answer with choice SKIP.",
+"3. If the answer is unclear, ask once for it again. Never say or hint which option is correct before record_answer returns.",
+"4. If the user says repeat or dobara, read the same question again. Do not call any function.",
+"5. If the user says stop, end or bas, call end_test.",
+"6. After record_answer returns, say in one short sentence whether it was correct, then give the explanation field in one or two short sentences in Hinglish (Hindi and English in Roman script). Then read next_question aloud exactly. If next_question is END, say the test is finished and call end_test.",
+"Keep everything short. Never use markdown or lists."].join("\n");
+var VTOOLS=[{functionDeclarations:[
+  {name:"record_answer",description:"Record the user's answer to the current question and get the verdict, explanation and the next question to read.",parameters:{type:"OBJECT",properties:{question_number:{type:"INTEGER",description:"Number of the question being answered"},choice:{type:"STRING",description:"A, B, C, D or SKIP"}},required:["question_number","choice"]}},
+  {name:"end_test",description:"End the test and show the results.",parameters:{type:"OBJECT",properties:{}}}
+]}];
+function spoken(q,n,total){
+  var t="Question "+n+" of "+total+". "+q.s.join(" ");
+  if(q.tb)t+=" "+q.tb.h[0]+": "+q.tb.r.map(function(r){return r[0]}).join("; ")+". "+q.tb.h[1]+": "+q.tb.r.map(function(r){return r[1]}).join("; ")+".";
+  t+=" Options. "+q.o.map(function(o,i){return "Option "+"ABCD".charAt(i)+": "+o+"."}).join(" ");
+  return t;
+}
+function toPCM16(f,inRate){
+  var r=inRate/16000,n=Math.floor(f.length/r),o=new Int16Array(n);
+  for(var i=0;i<n;i++){var s=0,c=0,a=Math.floor(i*r),b=Math.floor((i+1)*r);for(var j=a;j<b&&j<f.length;j++){s+=f[j];c++}var v=c?s/c:0;v=Math.max(-1,Math.min(1,v));o[i]=v<0?v*32768:v*32767}
+  return o;
+}
+function b64(buf){var u=new Uint8Array(buf),s="";for(var i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)}
+function vst(t){var e=$("#vst");if(e)e.textContent=t}
+function vcap(who,t){var e=$("#vcap");if(!e)return;var k="cap"+who;V[k]=(V[k]||"")+t;e.innerHTML='<div><b>You:</b> '+esc(V.capyou||"…")+'</div><div><b>Coach:</b> '+esc((V.capcoach||"").slice(-400)||"…")+'</div>'}
+function vshow(){
+  var e=$("#vq"),p=$("#vprog");if(!e)return;
+  var i=Math.min(S.vi,Q.length-1),q=Q[i],a=S.ans.filter(function(x){return x!==null}).length,c=S.ans.filter(function(x,k){return x===Q[k].a}).length;
+  p.textContent="Question "+Math.min(S.vi+1,Q.length)+" of "+Q.length+" · answered "+a+" · correct "+c;
+  e.innerHTML=$("#vshow").checked?stemHTML(q)+'<div class="vopts">'+q.o.map(function(o,k){return '<div><b>('+L[k]+')</b> '+esc(o)+'</div>'}).join("")+'</div>':'<p class="note">Question text is hidden. Listen and answer by voice.</p>';
+}
+function voiceScreen(){
+  if(!gkey()){setupScreen();showErr("Add your Gemini API key in the box at the top first.");return}
+  fresh();S.screen="voice";S.vi=0;
+  $("#app").innerHTML='<div class="card start"><h1>Voice quiz</h1><p class="sub">'+esc(META.title)+' · '+Q.length+' questions. The coach reads each question aloud, you answer out loud, and you hear right or wrong straight away. Your score and revision plan come at the end, same as the written test.</p>'+
+  '<div class="vbar"><span id="vst" class="vst">Press Start and allow the microphone.</span></div>'+
+  '<div id="vprog" class="note" style="margin:6px 0"></div><div id="vq" class="vq"></div><div id="vcap" class="vcap"></div>'+
+  '<label class="chk"><input type="checkbox" id="vshow" checked> Show question text on screen</label>'+
+  '<label class="chk"><input type="checkbox" id="vhead"> I am using headphones (lets you interrupt the coach)</label>'+
+  '<div class="btnrow"><button class="btn primary" id="vstart" style="padding:11px 26px;font-size:16px">Start voice quiz</button><button class="btn" id="vmute" hidden>Mute mic</button><button class="btn" id="vrep" hidden>Repeat question</button><button class="btn" id="vend" hidden>End and see result</button><button class="btn" id="vback">Back</button></div>'+
+  '<p class="note">Use headphones for the best result. Without them the mic stays off while the coach is talking, so it does not hear itself. Keep this screen open: browsers stop the microphone when the screen locks or the tab goes to the background.</p></div>';
+  $("#vshow").onchange=vshow;vshow();
+  $("#vstart").onclick=vStart;
+  $("#vback").onclick=function(){vCleanup();startScreen()};
+  $("#vmute").onclick=function(){if(!V)return;V.muted=!V.muted;$("#vmute").textContent=V.muted?"Unmute mic":"Mute mic"};
+  $("#vrep").onclick=function(){vSend({clientContent:{turns:[{role:"user",parts:[{text:"Please read this question again, exactly as given: "+spoken(Q[S.vi],S.vi+1,Q.length)}]}],turnComplete:true}})};
+  $("#vend").onclick=function(){vFinish()};
+}
+function vSend(o){if(V&&V.ws&&V.ws.readyState===1)V.ws.send(JSON.stringify(o))}
+async function vStart(){
+  vCleanup(true);
+  V={ws:null,ctx:null,stream:null,proc:null,src:null,next:0,srcs:[],ready:false,muted:false,ended:false,finishAfter:false,t0:V&&V.t0||Date.now(),chain:Promise.resolve(),wl:null};
+  $("#vstart").disabled=true;vst("Connecting…");
+  try{
+    V.ctx=new (window.AudioContext||window.webkitAudioContext)();await V.ctx.resume();
+    V.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1}});
+  }catch(e){vst("The microphone is not available. Allow microphone access for this page in the browser, then press Start again.");$("#vstart").disabled=false;vCleanup(true);return}
+  try{if(navigator.wakeLock)V.wl=await navigator.wakeLock.request("screen")}catch(e){}
+  var url=lsGet(GK.ws)||"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key="+encodeURIComponent(gkey());
+  var ws=new WebSocket(url);V.ws=ws;
+  ws.onopen=function(){
+    ws.send(JSON.stringify({setup:{model:"models/"+lmodel(),generationConfig:{responseModalities:["AUDIO"]},systemInstruction:{parts:[{text:VSYS}]},tools:VTOOLS,inputAudioTranscription:{},outputAudioTranscription:{}}}));
+  };
+  ws.onmessage=function(ev){
+    var cur=V;if(!cur)return;
+    cur.chain=cur.chain.then(async function(){
+      var txt=typeof ev.data==="string"?ev.data:await ev.data.text(),m;
+      try{m=JSON.parse(txt)}catch(e){return}
+      vMsg(m);
+    });
+  };
+  ws.onerror=function(){if(V&&!V.ended)vst("Connection error. Check the API key, the live model name and the internet, then press Start.")};
+  ws.onclose=function(ev){
+    if(!V||V.ended||V.ws!==ws)return;
+    var why=ev&&ev.reason?ev.reason:"code "+(ev&&ev.code);
+    vst("Connection closed ("+String(why).slice(0,160)+"). Press Start to reconnect; your answers so far are kept.");
+    vStopMic();$("#vstart").disabled=false;$("#vstart").textContent="Reconnect";
+  };
+}
+function vStartMic(){
+  V.src=V.ctx.createMediaStreamSource(V.stream);
+  V.proc=V.ctx.createScriptProcessor(4096,1,1);
+  V.proc.onaudioprocess=function(e){
+    if(!V||!V.ready||V.muted||!V.ws||V.ws.readyState!==1)return;
+    var head=$("#vhead");
+    if(!(head&&head.checked)&&V.ctx.currentTime<V.next+0.4)return;
+    var pcm=toPCM16(e.inputBuffer.getChannelData(0),V.ctx.sampleRate);
+    V.ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(pcm.buffer),mimeType:"audio/pcm;rate=16000"}}}));
+  };
+  V.src.connect(V.proc);V.proc.connect(V.ctx.destination);
+}
+function vStopMic(){
+  try{if(V&&V.proc){V.proc.disconnect();V.proc.onaudioprocess=null}}catch(e){}
+  try{if(V&&V.src)V.src.disconnect()}catch(e){}
+}
+function vPlay(d){
+  var bin=atob(d),n=bin.length>>1,buf=V.ctx.createBuffer(1,n,24000),ch=buf.getChannelData(0);
+  for(var i=0;i<n;i++){var v=bin.charCodeAt(2*i)|(bin.charCodeAt(2*i+1)<<8);if(v>=32768)v-=65536;ch[i]=v/32768}
+  var s=V.ctx.createBufferSource();s.buffer=buf;s.connect(V.ctx.destination);
+  var t=Math.max(V.ctx.currentTime+0.02,V.next);s.start(t);V.next=t+buf.duration;V.srcs.push(s);
+  s.onended=function(){var k=V&&V.srcs.indexOf(s);if(k>-1)V.srcs.splice(k,1)};
+}
+function vStopAudio(){if(!V)return;V.srcs.forEach(function(s){try{s.stop()}catch(e){}});V.srcs=[];V.next=0}
+function vSendQuestion(resume){
+  if(S.vi>=Q.length){vFinish();return}
+  vSend({clientContent:{turns:[{role:"user",parts:[{text:(resume?"We are resuming. ":"Let us begin. ")+"Read this question aloud now, exactly as given: "+spoken(Q[S.vi],S.vi+1,Q.length)}]}],turnComplete:true}});
+  vshow();
+}
+function vMsg(m){
+  if(!V)return;
+  if(m.setupComplete){
+    V.ready=true;vst("Connected. The coach will read the first question. Speak your answer after it.");
+    $("#vstart").hidden=true;["vmute","vrep","vend"].forEach(function(k){$("#"+k).hidden=false});
+    vStartMic();vSendQuestion(S.vi>0);return;
+  }
+  var sc=m.serverContent;
+  if(sc){
+    if(sc.interrupted)vStopAudio();
+    if(sc.modelTurn&&sc.modelTurn.parts)sc.modelTurn.parts.forEach(function(p){if(p.inlineData&&p.inlineData.data&&/audio/.test(p.inlineData.mimeType||"audio"))vPlay(p.inlineData.data)});
+    if(sc.inputTranscription&&sc.inputTranscription.text)vcap("you",sc.inputTranscription.text);
+    if(sc.outputTranscription&&sc.outputTranscription.text)vcap("coach",sc.outputTranscription.text);
+    if(sc.turnComplete){V.capyou="";V.capcoach="";if(V.finishAfter)setTimeout(function(){if(V&&V.finishAfter)vFinish()},Math.max(300,(V.next-V.ctx.currentTime)*1000+300))}
+  }
+  if(m.toolCall)(m.toolCall.functionCalls||[]).forEach(vTool);
+  if(m.goAway)vst("The server will close this session soon. Press Reconnect if it drops.");
+}
+function vTool(fc){
+  var a=fc.args||{},res;
+  if(fc.name==="record_answer"){
+    var c=String(a.choice||"").trim().toUpperCase().charAt(0),idx="ABCD".indexOf(c);
+    if(S.vi>=Q.length){res={error:"The test is already finished."}}
+    else{
+      var q=Q[S.vi];S.ans[S.vi]=idx<0?null:idx;
+      var verdict=idx<0?"skipped":idx===q.a?"correct":"wrong";
+      S.vi++;
+      res={verdict:verdict,correct_option:"ABCD".charAt(q.a),correct_answer:q.o[q.a],explanation:q.e,next_question:S.vi<Q.length?spoken(Q[S.vi],S.vi+1,Q.length):"END"};
+      if(S.vi>=Q.length)V.finishAfter=true;
+    }
+  }else if(fc.name==="end_test"){res={ok:true};V.finishAfter=true}
+  else res={error:"Unknown function"};
+  if(V.finishAfter)setTimeout(function(){if(V&&V.finishAfter&&V.screenOpen!==false)vFinish()},15000);
+  vSend({toolResponse:{functionResponses:[{id:fc.id,name:fc.name,response:{result:res}}]}});
+  vshow();
+}
+function vCleanup(keep){
+  if(!V)return;
+  V.ended=true;vStopAudio();vStopMic();
+  try{if(V.ws)V.ws.close()}catch(e){}
+  try{if(V.stream)V.stream.getTracks().forEach(function(t){t.stop()})}catch(e){}
+  try{if(V.ctx)V.ctx.close()}catch(e){}
+  try{if(V.wl)V.wl.release()}catch(e){}
+  var t0=V.t0;V=keep?{t0:t0}:null;
+}
+function vFinish(){
+  var t0=V&&V.t0||Date.now();
+  vCleanup();
+  S.screen="test";S.i=0;S.start=t0;S.last=Date.now();S.vis=Q.map(function(){return true});
+  submit(false);
+}
+
+setupScreen();
+</script>
