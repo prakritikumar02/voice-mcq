@@ -225,6 +225,9 @@ input[type=time]{font:inherit;color:var(--ink);background:var(--surface);border:
 .vcap{min-height:48px;font-size:14px;color:var(--muted);margin:8px 0}
 .callinks{padding-left:18px;line-height:1.9}
 .vmeter{height:6px;border-radius:3px;background:var(--line);margin:8px 0;overflow:hidden}.vmeter i{display:block;height:100%;width:0;background:var(--muted)}.vmeter i.on{background:var(--good)}
+.dbody{text-align:left;padding:14px}.dmsg{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 10px}.dmsg.you{background:var(--accent-soft)}.dmsg p{margin:6px 0}.dmsg ul{margin:6px 0;padding-left:20px}
+.dsrc{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:14px}.dsrc a{color:var(--accent);overflow-wrap:anywhere}
+.dfoot{padding:10px 12px;border-top:1px solid var(--line);background:var(--surface)}.dchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.drow{display:flex;gap:8px}.drow textarea{flex:1;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 </style>
 <div class="wrap" id="app"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -847,12 +850,14 @@ function renderResult(){
     if(!show)return;
     var vt=st==="c"?'<span class="verdict c">Correct +1</span>':st==="w"?'<span class="verdict w">Wrong −0.33</span>':'<span class="verdict s">Skipped</span>';
     var yours=S.ans[i]===null?'You did not answer this one.':'Your answer: <b>('+L[S.ans[i]]+')</b> · Correct answer: <b>('+L[q.a]+')</b>';
-    out+='<div class="card qcard rv"><div class="qhead"><span class="qnum">Q'+(i+1)+'</span><span class="tag">'+q.t+'</span><span class="tag '+q.d+'">'+DN[q.d]+'</span>'+(S.mrk[i]?'<span class="tag" style="color:var(--mark);border-color:var(--mark)">Marked</span>':'')+'<span class="tag mono">'+fmt(S.tm[i])+'</span>'+vt+'</div><div class="qbody">'+stemHTML(q)+optsHTML(q,i,true)+'<div class="exp"><p>'+yours+'</p><p>'+esc(q.e)+'</p><p class="ref">'+srcRef(q)+'</p></div></div></div>';
+    out+='<div class="card qcard rv"><div class="qhead"><span class="qnum">Q'+(i+1)+'</span><span class="tag">'+q.t+'</span><span class="tag '+q.d+'">'+DN[q.d]+'</span>'+(S.mrk[i]?'<span class="tag" style="color:var(--mark);border-color:var(--mark)">Marked</span>':'')+'<span class="tag mono">'+fmt(S.tm[i])+'</span>'+vt+'</div><div class="qbody">'+stemHTML(q)+optsHTML(q,i,true)+'<div class="exp"><p>'+yours+'</p><p>'+esc(q.e)+'</p><p class="ref">'+srcRef(q)+' <button type="button" class="btn dbtn" data-q="'+i+'">Dig deeper (web)</button></p></div></div></div>';
   });
   $("#rv").innerHTML=out||'<div class="card">No questions in this filter.</div>';
   document.querySelectorAll(".srcbtn").forEach(function(b){b.onclick=function(){openSource(b.dataset.sid,+b.dataset.page||1)}});
+  document.querySelectorAll(".dbtn").forEach(function(b){b.onclick=function(){openDoubt(+b.dataset.q)}});
 }
 document.addEventListener("keydown",function(e){
+  if(e.key==="Escape"&&$("#dbt")){closeDoubt();return}
   if(sv&&e.key==="Escape"){closeSource();return}
   if(sv)return;
   if(S.screen!=="test"||S.modal)return;
@@ -872,15 +877,18 @@ function keyCard(){
   '<p class="note" style="margin:8px 0">Paste your free key from Google AI Studio. It is stored only in this browser and is sent only to Google.</p>'+
   '<label class="lbl" for="gkey">API key</label><input id="gkey" type="password" autocomplete="off" placeholder="Paste your Gemini API key here" value="'+esc(gkey())+'">'+
   '<div class="fields"><div><label class="lbl" for="tmodel">Question-writing model</label><input id="tmodel" type="text" value="'+esc(tmodel())+'"></div>'+
-  '<div><label class="lbl" for="lmodel">Live voice model</label><input id="lmodel" type="text" value="'+esc(lmodel())+'"></div></div>'+
-  '<div class="btnrow"><button class="btn primary" id="ksave" type="button">Save</button><button class="btn" id="kclear" type="button">Remove key</button></div></details>';
+  '<div><label class="lbl" for="lmodel">Live voice model</label><input id="lmodel" type="text" value="'+esc(lmodel())+'"></div>'+
+  '<div><label class="lbl" for="dmodel">Doubt-solving model (uses web search)</label><input id="dmodel" type="text" value="'+esc(dmodel())+'"></div></div>'+
+  '<div class="btnrow"><button class="btn primary" id="ksave" type="button">Save</button><button class="btn" id="kclear" type="button">Remove key</button></div></details>'+
+  '<div class="btnrow" style="margin:0 0 10px"><button class="btn" id="gdoubt" type="button">Ask a doubt (searches the web)</button></div>';
 }
 function bindKey(){
   var s=$("#ksave");if(!s)return;
   s.onclick=function(){
-    lsSet(GK.key,$("#gkey").value.trim());lsSet(GK.tm,$("#tmodel").value.trim()||DEF_TM);lsSet(GK.lm,$("#lmodel").value.trim()||DEF_LM);
+    lsSet(GK.key,$("#gkey").value.trim());lsSet(GK.tm,$("#tmodel").value.trim()||DEF_TM);lsSet(GK.lm,$("#lmodel").value.trim()||DEF_LM);lsSet("gq:dmodel",$("#dmodel").value.trim());
     $("#kst").textContent=gkey()?"saved in this browser":"not set";checkReady();
   };
+  $("#gdoubt").onclick=function(){openDoubt(-1)};
   $("#kclear").onclick=function(){lsSet(GK.key,"");$("#gkey").value="";$("#kst").textContent="not set";checkReady()};
 }
 async function gemJson(prompt,signal){
@@ -939,6 +947,88 @@ function calFallback(tv){
   box.innerHTML='<div class="btnrow" style="margin:8px 0"><button class="btn primary" id="icsbtn" type="button">Download all as calendar file (.ics)</button></div><p class="note">Or tap a date to open it already filled in Google Calendar, then press Save:</p><ul class="callinks">'+links+'</ul>';
   $("#icsbtn").onclick=function(){saveBlob("revision-plan.ics",L2.join("\r\n"),"text/calendar")};
   calMsg("Events are set for "+tv+" with a 10 minute reminder. Choose a way below.");
+}
+
+/* ================= DOUBTS: web-grounded explanations ================= */
+var DSYS=["You are a patient tutor for UPPSC and other State PCS aspirants. The student's MCQs come from an NCERT chapter, but the doubt may go beyond it.",
+"Use Google Search and ground the answer in authentic sources: NCERT and other textbooks, government and archival sites (ASI, National Archives, Gazetteers, PIB, India Code), university presses, academic or peer-reviewed work, and reputable encyclopedias. Avoid blogs, coaching sites, forums and content farms; if nothing better exists, say so.",
+"Explain in Hinglish (Hindi and English in Roman script), in this order: 1) a short direct answer, 2) the deeper explanation, 3) what NCERT says versus what other sources add or dispute (name the historians or views if they differ), 4) Exam angle: how UPPSC could ask it and a way to remember it.",
+"Never invent citations, dates, names or quotes. If sources conflict or you are unsure, say so plainly. Keep it under about 300 words unless the student asks for more."].join("\n");
+var DH={},DQ=-2;
+function dmodel(){return (lsGet("gq:dmodel")||tmodel()).trim()}
+function mdLite(t){
+  var lines=esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").split(/\n/),out="",ul=false;
+  lines.forEach(function(l){var m=l.match(/^\s*[\*\-]\s+(.*)/);
+    if(m){if(!ul){out+="<ul>";ul=true}out+="<li>"+m[1]+"</li>"}
+    else{if(ul){out+="</ul>";ul=false}if(l.trim())out+="<p>"+l.replace(/^#+\s*/,"")+"</p>"}});
+  if(ul)out+="</ul>";return out;
+}
+function qContext(q){
+  var t="MCQ from the NCERT chapter ("+q.p+"):\n"+q.s.join("\n");
+  if(q.tb)t+="\n"+q.tb.h.join(" | ")+"\n"+q.tb.r.map(function(r){return r.join(" | ")}).join("\n");
+  t+="\n"+q.o.map(function(o,i){return "("+L[i]+") "+o}).join("\n")+"\nCorrect answer per the test: ("+L[q.a]+") "+q.o[q.a]+"\nExplanation given from the NCERT text: "+q.e;
+  return t;
+}
+async function gemDoubt(turns,signal){
+  var key=gkey();if(!key)throw {code:"nokey"};
+  var url="https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(dmodel())+":generateContent",res;
+  var body={systemInstruction:{parts:[{text:DSYS}]},contents:turns.map(function(t){return {role:t.role,parts:[{text:t.text}]}}),tools:[{google_search:{}}],generationConfig:{temperature:0.3}};
+  try{res=await fetch(url,{method:"POST",signal:signal,headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify(body)})}
+  catch(e){if(e&&e.name==="AbortError")throw {code:"cancelled"};throw {code:"network"}}
+  if(!res.ok){var t="";try{t=(await res.json()).error.message||""}catch(e){}
+    throw {code:res.status===429?"rate_limited":(res.status===403||(res.status===400&&/api key/i.test(t)))?"badkey":res.status===404?"nomodel":"http",message:String(t).slice(0,160)}}
+  var j=await res.json(),c=(j.candidates||[])[0]||{},parts=((c.content||{}).parts)||[];
+  var text=parts.map(function(p){return p.text||""}).join("").trim();
+  var gm=c.groundingMetadata||{},seen={},src=[];
+  (gm.groundingChunks||[]).forEach(function(g){var w=g.web;if(w&&w.uri&&!seen[w.uri]){seen[w.uri]=1;src.push({u:w.uri,t:w.title||w.uri})}});
+  if(!text)throw {code:"empty",message:"The model returned no text."};
+  return {text:text,sources:src,queries:gm.webSearchQueries||[]};
+}
+function closeDoubt(){var m=$("#dbt");if(m)m.remove()}
+function dRender(){
+  var h=DH[DQ]||[],b=$("#dbody");if(!b)return;
+  var out="";
+  h.forEach(function(t){
+    if(t.role==="user")out+='<div class="dmsg you"><b>You</b><p>'+esc(t.show||t.text)+'</p></div>';
+    else{
+      out+='<div class="dmsg"><b>Tutor</b>'+mdLite(t.text);
+      if(t.sources&&t.sources.length)out+='<div class="dsrc"><b>Sources used</b><ul>'+t.sources.map(function(s){return '<li><a target="_blank" rel="noopener noreferrer" href="'+esc(s.u)+'">'+esc(s.t)+'</a></li>'}).join("")+'</ul></div>';
+      else out+='<p class="note">No web sources were returned for this answer. Treat it as unverified and check a standard book.</p>';
+      out+='</div>';
+    }
+  });
+  if(S.dbusy)out+='<p class="note" role="status">Searching the web and writing the answer…</p>';
+  if(S.derr)out+='<p class="err" role="alert">'+esc(S.derr)+'</p>';
+  b.innerHTML=out||'<p class="note">Ask anything about this question. The answer is searched on the web, so it can go beyond the NCERT text. The test itself still comes only from your PDF.</p>';
+  b.scrollTop=b.scrollHeight;
+}
+async function dAsk(text,show){
+  text=(text||"").trim();if(!text||S.dbusy)return;
+  var h=DH[DQ]=DH[DQ]||[];
+  var first=!h.length,ctx=DQ>=0?qContext(Q[DQ])+"\n\nStudent's doubt: ":"Student's doubt"+(META.title?" (chapter: "+META.title+")":"")+": ";
+  h.push({role:"user",text:(first?ctx:"")+text,show:show||text});
+  S.dbusy=true;S.derr="";dRender();
+  try{
+    var r=await gemDoubt(h.map(function(t){return {role:t.role,text:t.text}}));
+    h.push({role:"model",text:r.text,sources:r.sources});
+  }catch(e){S.derr=e&&e.code==="empty"?e.message:errCopy(e);h.pop()}
+  S.dbusy=false;dRender();
+}
+function openDoubt(qi){
+  if(!gkey()){alert("Add your Gemini API key on the first screen.");return}
+  closeDoubt();DQ=qi;S.dbusy=false;S.derr="";
+  var m=document.createElement("div");m.className="modal src";m.id="dbt";
+  var chips=qi>=0?["Explain this in depth","Why are the other options wrong?","Related facts UPPSC may ask","Do historians disagree on this?"]:["Explain in depth","Give related facts for the exam"];
+  m.innerHTML='<div class="sv" role="dialog" aria-modal="true" aria-label="Ask a doubt"><div class="svh"><b>'+(qi>=0?'Dig deeper · Q'+(qi+1):'Ask a doubt')+'</b><span class="sp"></span><button class="btn" id="dcl">Close</button></div>'+
+  '<div class="svb dbody" id="dbody"></div><div class="dfoot"><div class="dchips">'+chips.map(function(c){return '<button class="chip" type="button">'+esc(c)+'</button>'}).join("")+'</div>'+
+  '<div class="drow"><textarea id="dtx" rows="2" placeholder="Type your doubt (Hindi or English)"></textarea><button class="btn primary" id="dgo">Ask</button></div>'+
+  '<p class="note" style="margin:6px 0 0">Answers use Google Search through Gemini and can still be wrong. For the exam, NCERT and standard books stay the base.</p></div></div>';
+  document.body.appendChild(m);
+  $("#dcl").onclick=closeDoubt;m.addEventListener("click",function(e){if(e.target===m)closeDoubt()});
+  m.querySelectorAll(".dchips .chip").forEach(function(c){c.onclick=function(){dAsk(c.textContent)}});
+  $("#dgo").onclick=function(){var t=$("#dtx").value;$("#dtx").value="";dAsk(t)};
+  $("#dtx").onkeydown=function(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#dgo").click()}};
+  dRender();$("#dtx").focus();
 }
 
 /* ================= VOICE QUIZ (Gemini Live) ================= */
