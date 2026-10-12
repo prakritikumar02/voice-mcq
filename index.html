@@ -986,15 +986,17 @@ function voiceScreen(){
   '<label class="chk"><input type="checkbox" id="vhead"> I am using headphones (lets you interrupt the coach)</label>'+
   '<label class="chk"><input type="checkbox" id="vptt"'+(lsGet("gq:ptt")==="1"?' checked':'')+'> Push to talk: the mic listens only while you hold the Talk button (best for a noisy room)</label>'+
   '<div class="fields"><div><label class="lbl" for="vnoise">Background noise filter</label><select id="vnoise"><option value="0">Off</option><option value="1">Standard</option><option value="2">Strong (noisy room)</option></select></div></div>'+
+  '<label class="chk"><input type="checkbox" id="vsens"'+(lsGet("gq:sens")==="1"?' checked':'')+'> Less sensitive speech detection (advanced; turn off if the connection drops)</label>'+
   '<div class="vmeter" title="Mic level"><i id="vlvl"></i></div>'+
   '<div class="btnrow"><button class="btn primary" id="vstart" style="padding:11px 26px;font-size:16px">Start voice quiz</button><button class="btn primary" id="vtalk" hidden style="padding:11px 26px;touch-action:none;user-select:none">Hold to talk</button><button class="btn" id="vmute" hidden>Mute mic</button><button class="btn" id="vrep" hidden>Repeat question</button><button class="btn" id="vend" hidden>End and see result</button><button class="btn" id="vback">Back</button></div>'+
   '<p class="note">Use headphones for the best result. Without them the mic stays off while the coach is talking, so it does not hear itself. Keep this screen open: browsers stop the microphone when the screen locks or the tab goes to the background.</p></div>';
   $("#vshow").onchange=vshow;vshow();
   $("#vnoise").value=lsGet("gq:noise")||"1";
   $("#vnoise").onchange=function(){lsSet("gq:noise",$("#vnoise").value);if(V)V.noise=+$("#vnoise").value};
+  $("#vsens").onchange=function(){lsSet("gq:sens",$("#vsens").checked?"1":"0")};
   $("#vptt").onchange=function(){lsSet("gq:ptt",$("#vptt").checked?"1":"0");vst("Push to talk changes apply the next time you press Start or Reconnect.")};
   var tk=$("#vtalk");
-  function talk(on){if(!V||!V.ready||V.talking===on)return;V.talking=on;tk.textContent=on?"Release to send":"Hold to talk";if(on){vStopAudio();vSend({realtimeInput:{activityStart:{}}})}else vSend({realtimeInput:{activityEnd:{}}})}
+  function talk(on){if(!V||!V.ready||V.talking===on)return;V.talking=on;tk.textContent=on?"Release to send":"Hold to talk";if(on)vStopAudio()}
   tk.onpointerdown=function(e){e.preventDefault();try{tk.setPointerCapture(e.pointerId)}catch(x){}talk(true)};
   tk.onpointerup=tk.onpointercancel=function(){talk(false)};
   tk.oncontextmenu=function(e){e.preventDefault()};
@@ -1006,7 +1008,7 @@ function voiceScreen(){
   $("#vrep").onclick=function(){vSend({clientContent:{turns:[{role:"user",parts:[{text:"Please read this question again, exactly as given: "+spoken(Q[S.vi],S.vi+1,Q.length)}]}],turnComplete:true}})};
   $("#vend").onclick=function(){vFinish()};
 }
-function vSend(o){if(V&&V.ws&&V.ws.readyState===1)V.ws.send(JSON.stringify(o))}
+function vSend(o){if(V&&V.ws&&V.ws.readyState===1){V.last=Object.keys(o)[0]+(o.toolResponse?" "+(o.toolResponse.functionResponses[0]||{}).name:"");V.ws.send(JSON.stringify(o))}}
 async function vStart(){
   vCleanup(true);
   V={ws:null,ctx:null,stream:null,proc:null,src:null,next:0,srcs:[],ready:false,muted:false,ended:false,finishAfter:false,t0:V&&V.t0||Date.now(),chain:Promise.resolve(),wl:null};
@@ -1019,9 +1021,10 @@ async function vStart(){
   var url=lsGet(GK.ws)||"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key="+encodeURIComponent(gkey());
   var ws=new WebSocket(url);V.ws=ws;
   ws.onopen=function(){
-    var ptt=!!($("#vptt")&&$("#vptt").checked);
-    var vad=ptt?{disabled:true}:{startOfSpeechSensitivity:"START_SENSITIVITY_LOW",endOfSpeechSensitivity:"END_SENSITIVITY_LOW",prefixPaddingMs:100,silenceDurationMs:700};
-    ws.send(JSON.stringify({setup:{model:"models/"+lmodel(),generationConfig:{responseModalities:["AUDIO"]},systemInstruction:{parts:[{text:VSYS}]},tools:VTOOLS,realtimeInputConfig:{automaticActivityDetection:vad},inputAudioTranscription:{},outputAudioTranscription:{}}}));
+    var su={model:"models/"+lmodel(),generationConfig:{responseModalities:["AUDIO"]},systemInstruction:{parts:[{text:VSYS}]},tools:VTOOLS,inputAudioTranscription:{},outputAudioTranscription:{}};
+    if($("#vsens")&&$("#vsens").checked)su.realtimeInputConfig={automaticActivityDetection:{startOfSpeechSensitivity:"START_SENSITIVITY_LOW",endOfSpeechSensitivity:"END_SENSITIVITY_LOW",prefixPaddingMs:100,silenceDurationMs:700}};
+    V.last="setup"+(su.realtimeInputConfig?" with speech-sensitivity":"");
+    ws.send(JSON.stringify({setup:su}));
   };
   ws.onmessage=function(ev){
     var cur=V;if(!cur)return;
@@ -1035,7 +1038,7 @@ async function vStart(){
   ws.onclose=function(ev){
     if(!V||V.ended||V.ws!==ws)return;
     var why=ev&&ev.reason?ev.reason:"code "+(ev&&ev.code);
-    vst("Connection closed ("+String(why).slice(0,160)+"). Press Start to reconnect; your answers so far are kept.");
+    vst("Connection closed ("+String(why).slice(0,160)+(V.last?"; last step: "+V.last:"")+"). Press Start to reconnect; your answers so far are kept.");
     vStopMic();$("#vstart").disabled=false;$("#vstart").textContent="Reconnect";
   };
 }
@@ -1063,7 +1066,6 @@ function vStartMic(){
       if(!open)V.floor+=(Math.min(rms,0.05)-V.floor)*0.02;
     }
     var m=$("#vlvl");if(m){m.style.width=Math.min(100,rms*900)+"%";m.className=open?"on":""}
-    if(V.ptt&&!open)return;
     var pcm=open?toPCM16(f,V.ctx.sampleRate):new Int16Array(Math.floor(f.length*16000/V.ctx.sampleRate));
     V.ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(pcm.buffer),mimeType:"audio/pcm;rate=16000"}}}));
   };
